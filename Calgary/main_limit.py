@@ -65,6 +65,7 @@ class Backtester:
         self.stoploss = None # le stop loss est fixe et calculé à la prise de position 
         self.units = None # quantité d'or contrôlée 
         self.trades = [] # log des trades cloturés
+        self.limit = None
 
     def on_candle(self, candle):
         open_ = candle["Open"]
@@ -76,91 +77,45 @@ class Backtester:
         prev_rsi = candle["prev_RSI"]
         moymob = candle["MoyMob"]
         bbupper = candle["BB_upper"]
-        prev_bbupper = candle["prev_BB_upper"]
         bblower = candle["BB_lower"]
         prev_bblower = candle["prev_BB_lower"]
 
-        #### Conditions de long
-        rsi_long_ok = (prev_rsi < 30) and (rsi > 30)
-        price_long_ok = (prev_close < prev_bblower) and (close > bblower)
-        shouldibuy = rsi_long_ok and price_long_ok
+        # Conditions d'achat
+        rsi_buy_ok = (prev_rsi < 30) and (rsi > 30)
+        price_buy_ok = (prev_close < prev_bblower) and (close > bblower)
+        shouldibuy = rsi_buy_ok and price_buy_ok
 
         # Conditions de vente
-        tp_long = moymob 
+        # tp_price = (bbupper + moymob)/2 # TP au milieu entre la moyenne mobile et BB Upper
+        tp_price = bbupper + 0.05
 
         rsi_sell_ok = (prev_rsi > 70) and (rsi < 70)
-        price_sell_ok = close >= tp_long
-        take_profit_long = rsi_sell_ok or price_sell_ok
+        price_sell_ok = close >= tp_price
+        take_profit = rsi_sell_ok or price_sell_ok
 
-        #### Conditions de short
-        rsi_short_ok = (prev_rsi > 70) and (rsi < 70)
-        price_short_ok = (prev_close > prev_bbupper) and (close < bbupper)
-        shouldisell = rsi_short_ok and price_short_ok
+        # === OUVERTURE DE POSITION ===
+        if self.position is None:
+            if self.limit != None:
+                if low < self.limit:
+                    self.position = "long"
+                    self.entry_price = self.limit
+                    self.limit = None
 
-        # conditions d'achat
-        tp_short = moymob 
+                    self.stoploss = self.entry_price * (1 - 0.002) # Stop 0.2% sous le prix de cloture (prix d'entrée)
+                    # self.stoploss = bblower * (1 - 0.0005)  # Stop 0.05% sous BB_lower
+                    self.units = self.position_size / self.entry_price
 
-        rsi_buy_ok = (prev_rsi < 30) and (rsi > 30)
-        price_buy_ok = close <= tp_short
-        take_profit_short = rsi_buy_ok or price_buy_ok
-
-        # === OUVERTURE DE POSITION SHORT ===
-        if self.position is None and shouldisell == True:
-            self.position = "short"
-            self.entry_price = close
-
-            self.stoploss = close * (1 + 0.002) # Stop 0.2% au dessus du prix de cloture (prix d'entrée)
-            # self.stoploss = bblower * (1 + 0.0005)  # Stop 0.05% au dessus de BB_upper
-            self.units = self.position_size / close
-
-            # On immobilise 25€
-            self.balance -= self.margin_per_trade
-
-        # === STOP LOSS SHORT ===
-        elif self.position == "short" and high >= self.stoploss:
-            pnl = (self.entry_price - self.stoploss) * self.units
-
-            self.balance += self.margin_per_trade  # marge restituée
-            self.balance += pnl                    # PnL du trade
-            self.trades.append(pnl)
-
-            print(f"{candle.name} --- SHORT stop loss --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
-
-            # Reset
-            self.position = None
-            self.entry_price = None
-            self.units = None
-            self.stoploss = None
+                    # On immobilise 25€
+                    self.balance -= self.margin_per_trade
+                else:
+                    if close >= moymob:
+                        self.limit = None
+            else:
+                if shouldibuy == True:
+                    self.limit = bblower
             
-        # === TAKE PROFIT SHORT ===
-        elif self.position == "short" and take_profit_short == True:
-            pnl = (self.entry_price - close) * self.units
 
-            self.balance += self.margin_per_trade  # marge restituée
-            self.balance += pnl                    # PnL du trade
-            self.trades.append(pnl)
-
-            print(f"{candle.name} --- SHORT take profit --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
-
-            # Reset
-            self.position = None
-            self.entry_price = None
-            self.units = None 
-            self.stoploss = None
-
-        # === OUVERTURE DE POSITION LONG ===
-        if self.position is None and shouldibuy == True:
-            self.position = "long"
-            self.entry_price = close
-
-            self.stoploss = close * (1 - 0.002) # Stop 0.2% sous le prix de cloture (prix d'entrée)
-            # self.stoploss = bblower * (1 - 0.0005)  # Stop 0.05% sous BB_lower
-            self.units = self.position_size / close
-
-            # On immobilise 25€
-            self.balance -= self.margin_per_trade
-
-        # === STOP LOSS LONG ===
+        # === STOP LOSS ===
         elif self.position == "long" and low <= self.stoploss:
             pnl = (self.stoploss - self.entry_price) * self.units
 
@@ -168,29 +123,28 @@ class Backtester:
             self.balance += pnl                    # PnL du trade
             self.trades.append(pnl)
 
-            print(f"{candle.name} --- LONG stop loss --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
+            print(f"{candle.name} --- stop loss --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
 
             # Reset
             self.position = None
             self.entry_price = None
             self.units = None
-            self.stoploss = None
             
-        # === TAKE PROFIT LONG ===
-        elif self.position == "long" and take_profit_long == True:
+
+        # === TAKE PROFIT ===
+        elif self.position == "long" and take_profit == True:
             pnl = (close - self.entry_price) * self.units
 
             self.balance += self.margin_per_trade  # marge restituée
             self.balance += pnl                    # PnL du trade
             self.trades.append(pnl)
 
-            print(f"{candle.name} --- LONG take profit --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
+            print(f"{candle.name} --- take profit --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
 
             # Reset
             self.position = None
             self.entry_price = None
             self.units = None
-            self.stoploss = None
         
         # Log de la balance actuelle pour le graphique
         self.balance_history.append(self.balance)
@@ -231,7 +185,6 @@ def main():
     # Ajout de colonnes en décalé pour que pour chaque candle on garde certaines infos de la candle précédente
     df['prev_close'] = df['Close'].shift(1)
     df['prev_BB_lower'] = df['BB_lower'].shift(1)
-    df['prev_BB_upper'] = df['BB_upper'].shift(1)
 
     df = df.dropna()
 
@@ -322,10 +275,3 @@ if __name__ == "__main__":
 # PNL total             : 198.21 €
 # Nombre de trades      : 15720
 # Moyenne du nombre de trades : 4.813227189222291 trades/jour
-
-# tp moymob
-# ===== BACKTEST TERMINE =====
-# Balance finale        : 300.43 €
-# PNL total             : 250.43 €
-# Nombre de trades      : 32078
-# Moyenne du nombre de trades : 9.821800367421924 trades/jour

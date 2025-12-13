@@ -29,7 +29,6 @@ def rsi(close_series, window = 13):
 
     return rsi
 
-
 def bollinger_bands(close_series, period=30, num_std=2):
     """
     Calcule les bandes de Bollinger.
@@ -53,12 +52,21 @@ def bollinger_bands(close_series, period=30, num_std=2):
 
 class Backtester: 
     def __init__(self, df, balance=BALANCE, leverage=LEVERAGE, margin_per_trade=MARGIN_TRADE): 
+        """
+        Docstring for __init__
+        
+        :param self: Description
+        :param df: Dataframe pour le backtest
+        :param balance: Quantité d'argent au départ dans le compte fictif
+        :param leverage: Levier utilisé pour trader
+        :param margin_per_trade: Marge en argent réservée de la balance
+        """
         self.dataframe = df 
         self.balance = balance 
         self.balance_history = []
         self.leverage = leverage 
         self.margin_per_trade = margin_per_trade # Calcul de la valeur notionnelle totale contrôlée 
-        self.position_size = margin_per_trade * leverage 
+        self.position_size = margin_per_trade * leverage # Taille de ma positione en cours 
 
         self.position = None # si je suis actuellement dans un trade 
         self.entry_price = None # si oui, à combien suis-je entrée 
@@ -74,34 +82,48 @@ class Backtester:
         low = candle["Low"]
         rsi = candle["RSI"]
         prev_rsi = candle["prev_RSI"]
-        moymob = candle["MoyMob"]
+        moymob = candle["MoyMob"] # Moyenne mobile, exact milieu entre BB lower et BB upper
         bbupper = candle["BB_upper"]
         prev_bbupper = candle["prev_BB_upper"]
         bblower = candle["BB_lower"]
         prev_bblower = candle["prev_BB_lower"]
 
         #### Conditions de long
+        # Si le RSI passe de inférieur à 30 à supérieur à 30
         rsi_long_ok = (prev_rsi < 30) and (rsi > 30)
+        # Et que le prix croise la BB lower par le bas
         price_long_ok = (prev_close < prev_bblower) and (close > bblower)
+        # Alors on considère qu'on est en position longue
         shouldibuy = rsi_long_ok and price_long_ok
 
-        # Conditions de vente
+        # Conditions de vente de la position longue
+        # take profit en variable car ajustable
         tp_long = moymob 
 
+        # Si le RSI croise la barre des 70 par le dessus 
         rsi_sell_ok = (prev_rsi > 70) and (rsi < 70)
+        # Et que le prix (close) a atteint le take profit définit plus haut
         price_sell_ok = close >= tp_long
+        # Alors on cloture la position longue
         take_profit_long = rsi_sell_ok or price_sell_ok
 
         #### Conditions de short
+        # Si le RSI croise la barre des 70 par le dessus 
         rsi_short_ok = (prev_rsi > 70) and (rsi < 70)
+        # Et que le prix croise la BB upper par le dessus 
         price_short_ok = (prev_close > prev_bbupper) and (close < bbupper)
+        # Alors on considère qu'on est en position short
         shouldisell = rsi_short_ok and price_short_ok
 
-        # conditions d'achat
+        # conditions d'achat de la position short 
+        # Take profit en variable car ajustable
         tp_short = moymob 
 
+        # Si le RSI croise la barre des 30 par le dessous 
         rsi_buy_ok = (prev_rsi < 30) and (rsi > 30)
+        # Et que le prix a atteint le take profit 
         price_buy_ok = close <= tp_short
+        # Alors on cloture la position short
         take_profit_short = rsi_buy_ok or price_buy_ok
 
         # === OUVERTURE DE POSITION SHORT ===
@@ -109,6 +131,7 @@ class Backtester:
             self.position = "short"
             self.entry_price = close
 
+            # On définit un stop loss dès l'entrée en position
             self.stoploss = close * (1 + 0.002) # Stop 0.2% au dessus du prix de cloture (prix d'entrée)
             # self.stoploss = bblower * (1 + 0.0005)  # Stop 0.05% au dessus de BB_upper
             self.units = self.position_size / close
@@ -118,8 +141,10 @@ class Backtester:
 
         # === STOP LOSS SHORT ===
         elif self.position == "short" and high >= self.stoploss:
+            # Calcul des gains/pertes
             pnl = (self.entry_price - self.stoploss) * self.units
 
+            # on débloque l'agrent de la balance
             self.balance += self.margin_per_trade  # marge restituée
             self.balance += pnl                    # PnL du trade
             self.trades.append(pnl)
@@ -134,8 +159,10 @@ class Backtester:
             
         # === TAKE PROFIT SHORT ===
         elif self.position == "short" and take_profit_short == True:
+            # Calcul des gains/pertes
             pnl = (self.entry_price - close) * self.units
 
+            # on débloque l'agrent de la balance
             self.balance += self.margin_per_trade  # marge restituée
             self.balance += pnl                    # PnL du trade
             self.trades.append(pnl)
@@ -153,6 +180,7 @@ class Backtester:
             self.position = "long"
             self.entry_price = close
 
+            # On définit un stop loss dès l'entrée en position
             self.stoploss = close * (1 - 0.002) # Stop 0.2% sous le prix de cloture (prix d'entrée)
             # self.stoploss = bblower * (1 - 0.0005)  # Stop 0.05% sous BB_lower
             self.units = self.position_size / close
@@ -162,6 +190,7 @@ class Backtester:
 
         # === STOP LOSS LONG ===
         elif self.position == "long" and low <= self.stoploss:
+            # Calcul des gains/pertes
             pnl = (self.stoploss - self.entry_price) * self.units
 
             self.balance += self.margin_per_trade  # marge restituée
@@ -178,6 +207,7 @@ class Backtester:
             
         # === TAKE PROFIT LONG ===
         elif self.position == "long" and take_profit_long == True:
+            # Calcul des gains/pertes
             pnl = (close - self.entry_price) * self.units
 
             self.balance += self.margin_per_trade  # marge restituée

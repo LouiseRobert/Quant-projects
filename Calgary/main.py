@@ -87,14 +87,14 @@ class Backtester:
         prev_bbupper = candle["prev_BB_upper"]
         bblower = candle["BB_lower"]
         prev_bblower = candle["prev_BB_lower"]
-
+        
         #### Conditions de long
         # Si le RSI passe de inférieur à 30 à supérieur à 30
         rsi_long_ok = (prev_rsi < 30) and (rsi > 30)
         # Et que le prix croise la BB lower par le bas
         price_long_ok = (prev_close < prev_bblower) and (close > bblower)
         # Alors on considère qu'on est en position longue
-        shouldibuy = rsi_long_ok and price_long_ok
+        shouldibuy = rsi_long_ok and price_long_ok 
 
         # Conditions de vente de la position longue
         # take profit en variable car ajustable
@@ -113,7 +113,7 @@ class Backtester:
         # Et que le prix croise la BB upper par le dessus 
         price_short_ok = (prev_close > prev_bbupper) and (close < bbupper)
         # Alors on considère qu'on est en position short
-        shouldisell = rsi_short_ok and price_short_ok
+        shouldisell = rsi_short_ok and price_short_ok 
 
         # conditions d'achat de la position short 
         # Take profit en variable car ajustable

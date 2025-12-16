@@ -37,14 +37,20 @@ class Backtester:
         rsi = candle["RSI"]
         prev_rsi = candle["prev_RSI"]
         moymob = candle["MoyMob"] # Moyenne mobile, exact milieu entre BB lower et BB upper
+        prev_moymob = candle['prev_MoyMob']
         bbupper = candle["BB_upper"]
         prev_bbupper = candle["prev_BB_upper"]
         bblower = candle["BB_lower"]
         prev_bblower = candle["prev_BB_lower"]
-        
-        if self.balance < self.balance * self.margin_ratio:
-            print("Fonds insuffisant.")
-            return
+
+        # Notion de trend
+        sma50 = candle['SMA50']
+        sma200 = candle['SMA200']
+
+        trend_haussier = sma50 >= sma200
+
+        # Notion de pente de la moyenne mobile, pour les conditions de sortie
+        slope = moymob - prev_moymob 
 
         #### Conditions de long
         # Si le RSI passe de inférieur à 30 à supérieur à 30
@@ -52,11 +58,11 @@ class Backtester:
         # Et que le prix croise la BB lower par le bas
         price_long_ok = (prev_close < prev_bblower) and (close > bblower)
         # Alors on considère qu'on est en position longue
-        shouldibuy = rsi_long_ok and price_long_ok 
+        shouldibuy = rsi_long_ok and price_long_ok and trend_haussier
 
         # Conditions de vente de la position longue
         # take profit en variable car ajustable
-        tp_long = moymob 
+        tp_long = moymob #- (moymob*0.001)
 
         # Si le RSI croise la barre des 70 par le dessus 
         rsi_sell_ok = (prev_rsi > 70) and (rsi < 70)
@@ -71,11 +77,11 @@ class Backtester:
         # Et que le prix croise la BB upper par le dessus 
         price_short_ok = (prev_close > prev_bbupper) and (close < bbupper)
         # Alors on considère qu'on est en position short
-        shouldisell = rsi_short_ok and price_short_ok 
+        shouldisell = rsi_short_ok and price_short_ok and not trend_haussier
 
         # conditions d'achat de la position short 
         # Take profit en variable car ajustable
-        tp_short = moymob 
+        tp_short = moymob #+ (moymob*0.001)
 
         # Si le RSI croise la barre des 30 par le dessous 
         rsi_buy_ok = (prev_rsi < 30) and (rsi > 30)
@@ -88,31 +94,42 @@ class Backtester:
         if self.position is None:
             # === OUVERTURE DE POSITION SHORT ===
             if shouldisell == True:
-                self.open_position(close, "short")
+                self.open_position(close, bbupper, "short")
 
             # === OUVERTURE DE POSITION LONG ===
             elif shouldibuy == True:
-                self.open_position(close, "long")
+                self.open_position(close, bblower, "long")
         # Si oui, on va gérer notre position en cours
         else:
             if self.position == "short":
                 # === STOP LOSS SHORT ===
                 if close >= self.stoploss:
-                    self.stop_loss("short", close, candle.name)
+                    self.exit_trade("stop loss", "short", close, candle.name)
+
+                # === TRAILING STOP ===
+                # Si la moymob est supérieure au prix d'entrée du short ou que la moyenne mobile est en train de monter
+                # elif moymob > self.entry_price and slope > 0:
+                #     self.exit_trade("trailing stop", "short", close, candle.name)
 
                 # === TAKE PROFIT SHORT ===
                 elif take_profit_short == True:
-                    self.take_profit("short", close, candle.name)
+                    self.exit_trade("take profit", "short", close, candle.name)
+
             elif self.position == "long":
                 # === STOP LOSS LONG ===
                 if close <= self.stoploss:
-                    self.stop_loss("long", close, candle.name)
+                    self.exit_trade("stop loss", "long", close, candle.name)
+                
+                # === TRAILING STOP ===
+                # Si la moymob est inférieure au prix d'entrée du long ou que la moyenne mobile est en train de chuter
+                # elif moymob < self.entry_price and slope < 0:
+                #     self.exit_trade("trailing stop", "long", close, candle.name)
 
                 # === TAKE PROFIT LONG ===
                 elif take_profit_long == True:
-                    self.take_profit("long", close, candle.name)
+                    self.exit_trade("take profit", "long", close, candle.name)
 
-    def open_position(self, entry_price: float, direction: str = "long"):
+    def open_position(self, entry_price: float, bb, direction: str = "long"):
         """
         Ouvre une position <direction> au prix <entry_price>
         
@@ -121,17 +138,6 @@ class Backtester:
         :param direction: Sens du trade: "long" ou "short"
         :type direction: str
         """
-        if direction in ("short", "Short"):
-            # On définit un stop loss dès l'entrée en position
-            self.stoploss = entry_price * (1 + 0.002) # Stop 0.2% au dessus du prix de cloture (prix d'entrée)
-            # self.stoploss = bblower * (1 + 0.0005)  # Stop 0.05% au dessus de BB_upper
-        elif direction in ("long", "Long"):
-            # On définit un stop loss dès l'entrée en position
-            self.stoploss = entry_price * (1 - 0.002) # Stop 0.2% sous du prix de cloture (prix d'entrée)
-            # self.stoploss = bblower * (1 - 0.0005)  # Stop 0.05% sous BB_upper
-        else:
-            raise ValueError("stop_loss : direction must be 'long' or 'short'")
-        
         self.position = direction
         self.entry_price = entry_price
 
@@ -140,11 +146,28 @@ class Backtester:
         self.units = self.position_size / entry_price
         self.balance -= self.margin_used
 
-    def stop_loss(self, direction, price, datetime = ""):
-        """
-        Déclenche un stop loss à close price et calcul de PNL correspondant au sens de la position en cours
+        if direction in ("short", "Short"):
+            # On définit un stop loss dès l'entrée en position
+            # self.stoploss = entry_price * (1 + 0.003) # Stop 0.3% au dessus du prix de cloture (prix d'entrée)
+            self.stoploss = bb * (1 + 0.01)  # Stop 0.05% au dessus de BB_upper
+            
+            # self.stoploss = self.entry_price - ((self.balance*0.005)/self.units) # Stop quand on a perdu 0.5% de la balance totale 
+        elif direction in ("long", "Long"):
+            # On définit un stop loss dès l'entrée en position
+            # self.stoploss = entry_price * (1 - 0.0036) # Stop 0.36% sous le prix de cloture (prix d'entrée)
+            self.stoploss = bb * (1 - 0.01)  # Stop 0.05% sous BB_lower
+
+            # self.stoploss = self.entry_price + ((self.balance*0.005)/self.units)# Stop quand on a perdu 0.5% de la balance totale 
+        else:
+            raise ValueError("stop_loss : direction must be 'long' or 'short'")
         
+    def exit_trade(self, label, direction, price, datetime = ""):
+        """
+        Docstring for exit_trade
+        
+        :param label: Description de la sortie du trade
         :param direction: Sens du trade à stopper
+        :param price: Prix d'excution de la sortie du trade
         :param datetime: Date et temps pour le log
         """
         # Calcul des gains/pertes
@@ -153,38 +176,15 @@ class Backtester:
         elif direction in ("long", "Long"):
             pnl = (price - self.entry_price) * self.units
         else:
-            raise ValueError("stop_loss : direction must be 'long' or 'short'")
+            raise ValueError(f"{label} : direction must be 'long' or 'short'")
 
         self.close_position(pnl)
 
-        print(f"{datetime} --- {direction} stop loss --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
+        print(f"{datetime} --- {direction} {label} --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
 
         # Reset
         self.reset()
 
-    def take_profit(self, direction, price, datetime = ""):
-        """
-        déclenche un take profit au prix price dans la direction du trade.
-        
-        :param direction: Sens du trade
-        :param price: Prix auquel cloturer le trade
-        :param datetime: Date et temps pour le log
-        """
-        # Calcul des gains/pertes
-        if direction in ("short", "Short"):
-            pnl = (self.entry_price - price) * self.units
-        elif direction in ("long", "Long"):
-            pnl = (price - self.entry_price) * self.units
-        else:
-            raise ValueError("stop_loss : direction must be 'long' or 'short'")
-
-        self.close_position(pnl)
-
-        print(f"{datetime} --- {direction} take profit --- prix d'entrée : {self.entry_price} --- {self.balance} ---")
-
-        # Reset
-        self.reset()
-    
     def close_position(self, pnl):
         """
         Fermeture d'un trade, mise à jour des variables du backtest

@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt 
 from Backtester import Backtester
 from maths import bollinger_bands, rsi
+import numpy as np
 
 DATA_FILE = "./data/XAUUSD.csv"
 
@@ -25,10 +26,16 @@ def main():
 
     df["MoyMob"], df["BB_upper"], df['BB_lower'] = bollinger_bands(df["Close"])
 
+    df['prev_MoyMob'] = df["MoyMob"].shift(5)
+    
     # Ajout de colonnes en décalé pour que pour chaque candle on garde certaines infos de la candle précédente
     df['prev_close'] = df['Close'].shift(1)
     df['prev_BB_lower'] = df['BB_lower'].shift(1)
     df['prev_BB_upper'] = df['BB_upper'].shift(1)
+
+    # Moyennes mobiles
+    df['SMA50'] = df['Close'].rolling(window=50).mean()
+    df['SMA200'] = df['Close'].rolling(window=200).mean()
 
     df = df.dropna()
 
@@ -63,6 +70,34 @@ def main():
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+    # balance = np.array(bt.balance_history, dtype=float)
+    # price = df["Close"].values.astype(float)
+    # min_len = min(len(balance), len(price))
+    # balance = balance[-min_len:]
+    # price = price[-min_len:]
+    # assert balance[0] > 0, "Balance initiale invalide"
+    # assert price[0] > 0, "Prix initial invalide"
+
+    # balance_norm = balance / balance[0] * 100
+    # price_norm = price / price[0] * 100
+
+    # plt.figure(figsize=(12, 5))
+
+    # plt.plot(balance_norm, label="Stratégie (base 100)", linewidth=1.5)
+    # plt.plot(price_norm, label="Or (base 100)", linewidth=1, alpha=0.7)
+
+    # plt.title("Performance relative : stratégie vs or")
+    # plt.xlabel("Nombre de candles")
+    # plt.ylabel("Base 100")
+    # plt.grid(True)
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.show()
+
+
+
+
 
 
 if __name__ == "__main__":

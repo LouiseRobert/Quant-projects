@@ -161,14 +161,14 @@ class Backtester:
         if direction in ("short", "Short"):
             # On définit un stop loss dès l'entrée en position
             # self.stoploss = entry_price * (1 + 0.003) # Stop 0.3% au dessus du prix de cloture (prix d'entrée)
-            self.stoploss = bb * (1 + 0.01)  # Stop 0.05% au dessus de BB_upper
+            self.stoploss = bb * (1 + 0.009)  # Stop 0.009% au dessus de BB_upper
             self.stoploss += half_spread
             
             # self.stoploss = self.entry_price - ((self.balance*0.005)/self.units) # Stop quand on a perdu 0.5% de la balance totale 
         elif direction in ("long", "Long"):
             # On définit un stop loss dès l'entrée en position
             # self.stoploss = entry_price * (1 - 0.0036) # Stop 0.36% sous le prix de cloture (prix d'entrée)
-            self.stoploss = bb * (1 - 0.01)  # Stop 0.05% sous BB_lower
+            self.stoploss = bb * (1 - 0.009)  # Stop 0.009% sous BB_lower
             self.stoploss -= half_spread
 
             # self.stoploss = self.entry_price + ((self.balance*0.005)/self.units)# Stop quand on a perdu 0.5% de la balance totale 

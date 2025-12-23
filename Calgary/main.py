@@ -24,7 +24,7 @@ def main():
     # Ajout de la colonne contenant le RSI précédent
     df['prev_RSI'] = df['RSI'].shift(1)
 
-    df["MoyMob"], df["BB_upper"], df['BB_lower'] = bollinger_bands(df["Close"], 23)
+    df["MoyMob"], df["BB_upper"], df['BB_lower'] = bollinger_bands(df["Close"], 21)
 
     df['prev_MoyMob'] = df["MoyMob"].shift(5)
     

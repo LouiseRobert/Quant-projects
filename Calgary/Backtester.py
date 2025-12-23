@@ -1,6 +1,7 @@
 
 BALANCE = 50 # Balance totale du compte
 LEVERAGE = 20 # Levier
+SPREAD = 0.04 # dollars
 
 class Backtester: 
     def __init__(self, df, balance=BALANCE, leverage=LEVERAGE): 
@@ -94,17 +95,24 @@ class Backtester:
         if self.position is None:
             # === OUVERTURE DE POSITION SHORT ===
             if shouldisell == True:
-                self.open_position(close, bbupper, "short")
+                direction = "short"
+
+                exec_price = self.get_execution_price(close, direction, "entry")
+                self.open_position(exec_price, bbupper, direction)
 
             # === OUVERTURE DE POSITION LONG ===
             elif shouldibuy == True:
-                self.open_position(close, bblower, "long")
+                direction = "long"
+
+                exec_price = self.get_execution_price(close, direction, "entry")
+                self.open_position(exec_price, bblower, "long")
         # Si oui, on va gérer notre position en cours
         else:
             if self.position == "short":
+                exec_price = self.get_execution_price(close, "long", "exit") # prix d'execution de sortie du short au prix ASK
                 # === STOP LOSS SHORT ===
                 if close >= self.stoploss:
-                    self.exit_trade("stop loss", "short", close, candle.name)
+                    self.exit_trade("stop loss", "short", exec_price, candle.name)
 
                 # === TRAILING STOP ===
                 # Si la moymob est supérieure au prix d'entrée du short ou que la moyenne mobile est en train de monter
@@ -113,12 +121,13 @@ class Backtester:
 
                 # === TAKE PROFIT SHORT ===
                 elif take_profit_short == True:
-                    self.exit_trade("take profit", "short", close, candle.name)
+                    self.exit_trade("take profit", "short", exec_price, candle.name)
 
             elif self.position == "long":
+                exec_price = self.get_execution_price(close, "short", "exit") # prix d'execution de sortie du long au prix BID
                 # === STOP LOSS LONG ===
                 if close <= self.stoploss:
-                    self.exit_trade("stop loss", "long", close, candle.name)
+                    self.exit_trade("stop loss", "long", exec_price, candle.name)
                 
                 # === TRAILING STOP ===
                 # Si la moymob est inférieure au prix d'entrée du long ou que la moyenne mobile est en train de chuter
@@ -127,7 +136,7 @@ class Backtester:
 
                 # === TAKE PROFIT LONG ===
                 elif take_profit_long == True:
-                    self.exit_trade("take profit", "long", close, candle.name)
+                    self.exit_trade("take profit", "long", exec_price, candle.name)
 
     def open_position(self, entry_price: float, bb, direction: str = "long"):
         """
@@ -184,6 +193,27 @@ class Backtester:
 
         # Reset
         self.reset()
+
+    def get_execution_price(self, price, direction, side):
+        """
+        Renvoie le prix d'éxécution simulé selon le spread choisi
+        side: 'entry' ou 'exit'
+        direction: 'long' ou 'short'
+        """
+        half_spread = SPREAD / 2
+
+        if direction in ("long", "Long"):
+            if side == "entry":
+                return price + half_spread  # achat au ask
+            else:
+                return price - half_spread  # vente au bid
+
+        elif direction in ("short", "Short"):
+            if side == "entry":
+                return price - half_spread  # vente au bid
+            else:
+                return price + half_spread  # rachat au ask
+
 
     def close_position(self, pnl):
         """

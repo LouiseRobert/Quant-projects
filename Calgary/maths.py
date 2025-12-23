@@ -20,7 +20,7 @@ def rsi(close_series, window = 13):
 
     return rsi
 
-def bollinger_bands(close_series, period=30, num_std=2):
+def bollinger_bands(close_series, period=25, num_std=2):
     """
     Calcule les bandes de Bollinger.
     

@@ -4,7 +4,7 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi
 import numpy as np
 
-DATA_FILE = "./data/XAUUSD.csv"
+DATA_FILE = "./data/output8.csv"
 
 def main():
     df = pd.read_csv(DATA_FILE, sep="\t")
@@ -24,7 +24,7 @@ def main():
     # Ajout de la colonne contenant le RSI précédent
     df['prev_RSI'] = df['RSI'].shift(1)
 
-    df["MoyMob"], df["BB_upper"], df['BB_lower'] = bollinger_bands(df["Close"])
+    df["MoyMob"], df["BB_upper"], df['BB_lower'] = bollinger_bands(df["Close"], 23)
 
     df['prev_MoyMob'] = df["MoyMob"].shift(5)
     

@@ -1,7 +1,7 @@
 
 BALANCE = 50 # Balance totale du compte
 LEVERAGE = 20 # Levier
-SPREAD = 0.04 # dollars
+SPREAD = 0.4 # dollars
 
 class Backtester: 
     def __init__(self, df, balance=BALANCE, leverage=LEVERAGE): 
@@ -111,7 +111,7 @@ class Backtester:
             if self.position == "short":
                 exec_price = self.get_execution_price(close, "long", "exit") # prix d'execution de sortie du short au prix ASK
                 # === STOP LOSS SHORT ===
-                if close >= self.stoploss:
+                if exec_price >= self.stoploss:
                     self.exit_trade("stop loss", "short", exec_price, candle.name)
 
                 # === TRAILING STOP ===
@@ -126,7 +126,7 @@ class Backtester:
             elif self.position == "long":
                 exec_price = self.get_execution_price(close, "short", "exit") # prix d'execution de sortie du long au prix BID
                 # === STOP LOSS LONG ===
-                if close <= self.stoploss:
+                if exec_price <= self.stoploss:
                     self.exit_trade("stop loss", "long", exec_price, candle.name)
                 
                 # === TRAILING STOP ===
@@ -155,16 +155,21 @@ class Backtester:
         self.units = self.position_size / entry_price
         self.balance -= self.margin_used
 
+        # intégration du spread pour le calcul des stops
+        half_spread = SPREAD / 2
+
         if direction in ("short", "Short"):
             # On définit un stop loss dès l'entrée en position
             # self.stoploss = entry_price * (1 + 0.003) # Stop 0.3% au dessus du prix de cloture (prix d'entrée)
             self.stoploss = bb * (1 + 0.01)  # Stop 0.05% au dessus de BB_upper
+            self.stoploss += half_spread
             
             # self.stoploss = self.entry_price - ((self.balance*0.005)/self.units) # Stop quand on a perdu 0.5% de la balance totale 
         elif direction in ("long", "Long"):
             # On définit un stop loss dès l'entrée en position
             # self.stoploss = entry_price * (1 - 0.0036) # Stop 0.36% sous le prix de cloture (prix d'entrée)
             self.stoploss = bb * (1 - 0.01)  # Stop 0.05% sous BB_lower
+            self.stoploss -= half_spread
 
             # self.stoploss = self.entry_price + ((self.balance*0.005)/self.units)# Stop quand on a perdu 0.5% de la balance totale 
         else:
@@ -213,7 +218,6 @@ class Backtester:
                 return price - half_spread  # vente au bid
             else:
                 return price + half_spread  # rachat au ask
-
 
     def close_position(self, pnl):
         """

@@ -67,23 +67,30 @@ def get_last_candles(cst, token, candle_number = 1):
     """
     Renvoie un dictionnaire contenant les <candle_number> dernières candles.
 
-    :return: list de dict
+    :return: list de dict, None si la requete n'a pas abouti
     """
-    conn = http.client.HTTPSConnection(API_FQDN)
-    payload = ''
-    headers = {
-    'X-SECURITY-TOKEN': token,
-    'CST': cst
-    }
-    conn.request("GET", f"/api/v1/prices/{TICKER}?resolution=MINUTE&max={candle_number}", payload, headers)
-    res = conn.getresponse()
-    data = res.read()
+    try:
+        conn = http.client.HTTPSConnection(API_FQDN)
+        payload = ''
+        headers = {
+        'X-SECURITY-TOKEN': token,
+        'CST': cst
+        }
+        conn.request("GET", f"/api/v1/prices/{TICKER}?resolution=MINUTE&max={candle_number}", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
 
-    json_str = data.decode("utf-8")
+        json_str = data.decode("utf-8")
 
-    data_dict = json.loads(json_str)
+        data_dict = json.loads(json_str)
 
-    candles = data_dict["prices"]
+        if data_dict['prices'] is not None:
+            candles = data_dict["prices"]
+        else:
+            candles = None
+
+    except Exception as e:
+        print(f"ERREUR: Récupération de la dernière candle : {e}")
 
     return candles
 
@@ -167,7 +174,7 @@ def wait_for_next_closed_candle(cst, token, last_candle_time):
     while True:
         candle = get_last_candles(cst, token, 2)[-2]
 
-        if candle['snapshotTime'] != last_candle_time:
+        if candle is not None and candle['snapshotTime'] != last_candle_time :
             return candle
 
         time.sleep(5)
@@ -205,6 +212,12 @@ if __name__ == "__main__":
     ### Initialisation
     # On récupère les dernières candles pour pouvoir calculer le RSI
     candles = get_last_candles(cst, token, candle_number=RSI_PERIOD + 1)
+
+    while candles is None:
+        print("Erreur dans la récupération des candles, attente de 5 secondes...")
+        time.sleep(5)
+        candles = get_last_candles(cst, token, candle_number=RSI_PERIOD + 1)
+
     # On extrait les prix de cloture des candles récupérées
     closes = extract_close_prices(candles)
 

@@ -3,6 +3,7 @@ import json
 import time
 import datetime
 import smtplib, ssl
+from email.message import EmailMessage
 
 from creds import login, password, apikey, gmail_password, gmail_sender, gmail_receiver
 
@@ -20,7 +21,7 @@ TICKER = "GOLD"
 ### PARAMETRES RSI
 RSI_PERIOD = 13
 RSI_HIGH = 75
-RSI_LOW = 30
+RSI_LOW = 27
 
 def get_API_time():
     """
@@ -179,23 +180,23 @@ def alerte(objet, message):
     :param message: str, corps du mail
     """
     try:
-        smtp_server = SMTP
-        port = SMTP_PORT
-        sender_email = SENDER_EMAIL
-        app_password = gmail_password
-        receiver_email = RECEIVER_EMAIL
-        message = f"""\
-        Subject: {objet}
-        {message}
 
-        Ceci est un email automatique envoye depuis un script Python."""
+        msg = EmailMessage()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = RECEIVER_EMAIL
+        msg["Subject"] = objet
+
+        msg.set_content(
+            message,
+            charset="utf-8"
+        )
 
         context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
-            server.login(sender_email, app_password)
-            server.sendmail(sender_email, receiver_email, message)
-    except:
-        print("ERREUR: Envoi de mail")
+        with smtplib.SMTP_SSL(SMTP, SMTP_PORT, context=context) as server:
+            server.login(SENDER_EMAIL, gmail_password)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"ERREUR: Envoi de mail : {e}")
 
 if __name__ == "__main__":
     auth = get_connection_token()
@@ -238,11 +239,11 @@ if __name__ == "__main__":
         # Détection de franchissement
         # Si le RSI vient de franchir la limite haute
         if previous_rsi < RSI_HIGH and current_rsi >= RSI_HIGH:
-            alerte(objet = f"RSI crossed ABOVE {RSI_HIGH}", message= "Il faut effctuer un BUY.")
+            alerte(objet = f"RSI crossed ABOVE {RSI_HIGH}", message= "Il faut effctuer un SELL.")
 
         # Si le RSI vient de franchir la limite basse
         if previous_rsi > RSI_LOW and current_rsi <= RSI_LOW:
-            alerte(objet = f"RSI crossed BELOW {RSI_LOW}", message= "Il faut effctuer un SELL.")
+            alerte(objet = f"RSI crossed BELOW {RSI_LOW}", message= "Il faut effctuer un BUY.")
 
         # Initialisation pour la prochaine candle
         previous_timestamp = candle['snapshotTime']

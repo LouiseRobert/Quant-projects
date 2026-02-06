@@ -20,8 +20,8 @@ TICKER = "GOLD"
 
 ### PARAMETRES RSI
 RSI_PERIOD = 13
-RSI_HIGH = 75
-RSI_LOW = 27
+RSI_HIGH = 72
+RSI_LOW = 28
 
 def get_API_time():
     """
@@ -224,11 +224,11 @@ if __name__ == "__main__":
     # Calcul du dernier RSI
     avg_gain, avg_loss = compute_initial_avg_gain_loss(closes, RSI_PERIOD)
     previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
-    print(f"RSI previous: {previous_rsi}")
 
     # Initialisation avant le while True
     previous_timestamp = candles[-1]['snapshotTime']
     previous_close = closes[-1]
+
 
     print(f"Début du process : {datetime.datetime.now()}")
     while True:

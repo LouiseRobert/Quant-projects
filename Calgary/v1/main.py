@@ -4,19 +4,25 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi
 import numpy as np
 
-DATA_FILE = "./data/output8.csv"
+DATA_FILE = "./data/XAU_1m_2021_to_2026.csv"
 
 def main():
-    df = pd.read_csv(DATA_FILE, sep="\t")
+    df = pd.read_csv(DATA_FILE, sep=";")
 
-    # Combiner 'Date' + 'Timestamp' en un seul datetime
-    df["datetime"] = pd.to_datetime(df["Date"].astype(str) + " " + df["Timestamp"])
+    # Conversion de la colonne Date en datetime
+    df["datetime"] = pd.to_datetime(
+        df["Date"],
+        format="%Y.%m.%d %H:%M"
+    )
 
-    # Mettre l’index
+    # Conversion en timestamp Unix (secondes)
+    df["timestamp"] = df["datetime"].astype("int64") # 10**9
+
+    # Mettre le datetime en index
     df = df.set_index("datetime")
 
-    # Optionnel retirer les anciennes colonnes
-    df = df.drop(columns=["Date", "Timestamp"])
+    # Nettoyage des colonnes inutiles
+    df = df.drop(columns=["Date"])
 
     # Ajout de la colonne RSI pour chaque candle
     df["RSI"] = rsi(df["Close"])

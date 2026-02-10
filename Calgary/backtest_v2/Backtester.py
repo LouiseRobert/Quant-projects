@@ -111,7 +111,8 @@ class Backtester:
                 elif take_profit_long == True:
                     exec_price = self.get_execution_price(high, "short", "exit") # prix d'execution de sortie du long au prix BID
                     self.exit_trade("take profit", "long", exec_price, candle.name)
-        self.balance_history.append(self.balance)
+            else:
+                self.balance_history.append(self.balance)
 
     def open_position(self, entry_price: float, direction: str = "long"):
         """
@@ -136,7 +137,7 @@ class Backtester:
         half_spread = SPREAD/2
         # SL / TP fixés en € sur la balance totale
         loss_amount = 0.05 * balance_before_trade
-        profit_amount = 0.0065 * balance_before_trade
+        profit_amount = 0.007 * balance_before_trade
 
         # prix de SL / TP correct
         if self.position == "long":
@@ -172,6 +173,7 @@ class Backtester:
 
         print(f"{datetime} --- {direction} {label} --- prix d'entree : {self.entry_price} --- {self.balance} ---")
 
+        self.balance_history.append(self.balance)
         # Reset
         self.reset()
 

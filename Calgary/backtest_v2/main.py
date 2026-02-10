@@ -4,7 +4,7 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi
 import numpy as np
 
-DATA_FILE = "../data/XAU_1m_2025_2026.csv"
+DATA_FILE = "../data/XAU_1m_2023.csv"
 
 def main():
     df = pd.read_csv(DATA_FILE, sep=";")

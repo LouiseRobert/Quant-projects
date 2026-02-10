@@ -70,6 +70,8 @@ def get_last_candles(cst, token, candle_number = 1):
     :return: list de dict, None si la requete n'a pas abouti
     """
     try:
+        candles = None
+
         conn = http.client.HTTPSConnection(API_FQDN)
         payload = ''
         headers = {
@@ -172,10 +174,11 @@ def wait_for_next_closed_candle(cst, token, last_candle_time):
     :return: dict de la nouvelle candle
     """
     while True:
-        candle = get_last_candles(cst, token, 2)[-2]
+        candle = get_last_candles(cst, token, 2)
 
-        if candle is not None and candle['snapshotTime'] != last_candle_time :
-            return candle
+        # si les candles ont pu être récupérées, on renvoie la première (la dernière candle cloturée)
+        if candle is not None and candle[-2]['snapshotTime'] != last_candle_time :
+            return candle[-2]
 
         time.sleep(5)
 

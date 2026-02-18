@@ -30,6 +30,9 @@ class Backtester:
         self.units = None # quantité d'or contrôlée 
         self.trades = [] # log des trades cloturés
 
+        self.rsi_cross_low = False
+        self.rsi_cross_high = False
+
     def on_candle(self, candle):
         close = candle["Close"]
         high = candle["High"]
@@ -45,17 +48,24 @@ class Backtester:
         if self.position is None:
             #### Conditions de long
             # Si le RSI passe de inférieur à 30 à supérieur à 30 et que le RSI actuel est < au précédent
-            rsi_long_ok = (rsi_2 < 30) and (rsi_1 > 30) and (rsi > rsi_1)
-
+            # rsi_long_ok = (rsi_2 < 30) and (rsi_1 > 30) and (rsi > rsi_1)
+            if rsi < 25:
+                self.rsi_cross_low = True
             # Alors on considère qu'on est en position longue
-            shouldibuy = rsi_long_ok
+            shouldibuy = self.rsi_cross_low and (rsi > 35)
 
             #### Conditions de short
             # Si le RSI croise la barre des 70 par le dessus 
-            rsi_short_ok = (rsi_2 > 70) and (rsi_1 < 70) and (rsi < rsi_1)
-
+            # rsi_short_ok = (rsi_2 > 70) and (rsi_1 < 70) and (rsi < rsi_1)
+            if rsi > 75:
+                self.rsi_cross_high = True
             # Alors on considère qu'on est en position short
-            shouldisell = rsi_short_ok 
+            shouldisell = self.rsi_cross_high and (rsi < 65)
+
+            if rsi > 50:
+                self.rsi_cross_low = False
+            else:
+                self.rsi_cross_high = False
 
             # === OUVERTURE DE POSITION SHORT ===
             if shouldisell == True:
@@ -136,8 +146,8 @@ class Backtester:
             
         half_spread = SPREAD/2
         # SL / TP fixés en € sur la balance totale
-        loss_amount = 0.05 * balance_before_trade
-        profit_amount = 0.007 * balance_before_trade
+        loss_amount = 0.03 * balance_before_trade
+        profit_amount = 0.0085 * balance_before_trade
 
         # prix de SL / TP correct
         if self.position == "long":
@@ -213,6 +223,9 @@ class Backtester:
         Remet à None les parametres propres à une position courante.
         Met à jour l'historique de balance avec la balance courante.        
         """
+        self.rsi_cross_high = False
+        self.rsi_cross_low = False
+
         self.balance_history.append(self.balance)
         self.position = None
         self.margin_used = None

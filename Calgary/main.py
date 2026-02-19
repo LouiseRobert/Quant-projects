@@ -3,15 +3,47 @@ import json
 import time, datetime
 from creds import login, password, apikey
 
+from maths import compute_initial_avg_gain_loss, calcul_order_size, compute_rsi_from_avg, extract_close_prices
+
+from mailing import alerte
+
 API_FQDN = "demo-api-capital.backend-capital.com"
 TICKER = "GOLD"
 CALGARY_ACCOUNT_NAME = "Calgary"
 
 ### PARAMETRES RSI
 RSI_PERIOD = 13
-RSI_HIGH = 72
-RSI_LOW = 28
+RSI_HIGH = 75
+RSI_LOW = 25
+
+QTE_LOSS = 0.03 # 3% de perte
+QTE_TP = 0.0085 # 0.85% de gain si TP
     
+def get_connection_token():
+    """
+    Connecte à l'API de Capital.com
+    Renvoie un dictionnaire avec les infos d'autentifications pour les futures requetes API.
+
+    :return: dict contenant "CST" et "Token" 
+    """
+    conn = http.client.HTTPSConnection(API_FQDN)
+    payload = json.dumps({
+    "identifier": login,
+    "password": password
+    })
+    headers = {
+    'X-CAP-API-KEY': apikey,
+    'Content-Type': 'application/json'
+    }
+    conn.request("POST", "/api/v1/session", payload, headers)
+    res = conn.getresponse()
+    data = res.read()
+
+    auth = {"CST": res.getheader("CST"),
+            "Token": res.getheader("X-SECURITY-TOKEN")}
+
+    return auth
+
 def get_account_leverage(cst, token):
     """
     Renvoie le levier utilisé pour le compte courant
@@ -59,38 +91,13 @@ def get_account_info(cst, token):
                 result = {
                     "id": acc["accountId"],
                     "status": acc["status"],
-                    "balancetotale": ["balance"]["balance"],
+                    "balancetotale": acc["balance"]["balance"],
                     "balancedispo": acc["balance"]["available"]
                 }                  
     else:
         print("No account found")
 
     return result
-
-def get_connection_token():
-    """
-    Connecte à l'API de Capital.com
-    Renvoie un dictionnaire avec les infos d'autentifications pour les futures requetes API.
-
-    :return: dict contenant "CST" et "Token" 
-    """
-    conn = http.client.HTTPSConnection(API_FQDN)
-    payload = json.dumps({
-    "identifier": login,
-    "password": password
-    })
-    headers = {
-    'X-CAP-API-KEY': apikey,
-    'Content-Type': 'application/json'
-    }
-    conn.request("POST", "/api/v1/session", payload, headers)
-    res = conn.getresponse()
-    data = res.read()
-
-    auth = {"CST": res.getheader("CST"),
-            "Token": res.getheader("X-SECURITY-TOKEN")}
-
-    return auth
 
 def get_all_accounts(cst, token):
     """
@@ -132,6 +139,7 @@ def switch_active_account(cst, token, acc_id):
 
     :return: dict {"trailingStopsEnabled", "dealingEnabled", "hasActiveDemoAccounts", "hasActiveLiveAccounts"}
     """
+    result = None
     conn = http.client.HTTPSConnection(API_FQDN)
     payload = json.dumps({
     "accountId": acc_id
@@ -147,31 +155,17 @@ def switch_active_account(cst, token, acc_id):
     json_str = data.decode("utf-8")
 
     data_dict = json.loads(json_str)
-
-    if data_dict['dealingEnabled']:
-        result = data_dict
+    
+    try:
+        if data_dict['dealingEnabled']:
+            result = data_dict
+    except KeyError as e:
+        if data_dict['errorCode'] == 'error.not-different.accountId':
+            result = acc_id
+        else:
+            print("ERREUR", e)
     
     return result
-
-def calcul_order_size(balance_totale, leverage, price):
-    """
-    Calcule la taille de l'ordre qui doit être passé selon la balance totale, le levier et le prix
-    
-    :param balance_totale: Description
-    :param leverage: Description
-    :param price: Description
-
-    :return: float, taille de l'ordre qui va être passé
-    """
-    margin_ratio = 0.5
-
-    margin_used = balance_totale * margin_ratio
-
-    notional = margin_used * leverage
-
-    size = notional / price
-
-    return round(size, 2)
 
 def wait_for_next_closed_candle(cst, token, last_candle_time): 
     """
@@ -270,73 +264,6 @@ def get_price(cst, token, direction):
 
     return price
 
-def extract_close_prices(candles):
-    """
-    Extrait le prix moyen de cloture des candles passées en paramètre.
-    
-    :param candles: list de dict de candles
-    :return: liste des prix moyen de cloture des candles, la dernière est la plus récente
-    """
-    # {'snapshotTime': '2026-02-04T19:12:00', 'snapshotTimeUTC': '2026-02-04T18:12:00', 'openPrice': {'bid': 4909.08, 'ask': 4910.08}, 'closePrice': {'bid': 4907.28, 'ask': 4909.18}, 'highPrice': {'bid': 4912.22, 'ask': 4913.22}, 'lowPrice': {'bid': 4905.71, 'ask': 4907.33}, 'lastTradedVolume': 273}
-    closes = []
-    for candle in candles:
-        avg_close = ( candle['closePrice']['bid'] + candle['closePrice']['bid'] )/ 2
-        closes.append(avg_close)
-    
-    # On inverse la liste pour faire passer la candle la plus récente à la fin
-    return closes[::-1]
-
-def compute_initial_avg_gain_loss(closes, period=13):
-    """
-    Calcule l'average gain et loss initial pour le RSI (méthode de Wilder)
-
-    :param closes: liste ou array de prix de clôture
-                   longueur = period + 1
-    :param period: période RSI (ex: 13)
-    :return: (avg_gain, avg_loss)
-    """
-
-    if len(closes) != period + 1:
-        raise ValueError(
-            f"Il faut exactement {period + 1} closes, reçu {len(closes)}"
-        )
-
-    total_gain = 0.0
-    total_loss = 0.0
-
-    for i in range(1, len(closes)):
-        delta = closes[i] - closes[i - 1]
-
-        if delta > 0:
-            total_gain += delta
-        else:
-            total_loss += abs(delta)
-
-    avg_gain = total_gain / period
-    avg_loss = total_loss / period
-
-    return avg_gain, avg_loss
-
-def compute_rsi_from_avg(avg_gain, avg_loss):
-    """
-    Calcule le RSI à partir des moyennes de gains/pertes (Wilder)
-
-    :param avg_gain: moyenne des gains
-    :param avg_loss: moyenne des pertes
-    :return: RSI (float entre 0 et 100)
-    """
-
-    if avg_loss == 0:
-        return 100.0
-
-    if avg_gain == 0:
-        return 0.0
-
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-
-    return rsi
-
 def create_position(cst, token, direction, available_balance, leverage):
     """
     Ouvre une position dans la direction choisie.
@@ -360,6 +287,7 @@ def create_position(cst, token, direction, available_balance, leverage):
     "size": size, # genre 0.3 
     "guaranteedStop": True, # True pour moi car pas le choix
     "stopAmount": round(available_balance*0.47), # Quantité à perdre si SL 
+    "profitAmount": round(available_balance*QTE_TP) # Quantité à gagner si TP
     })
     headers = {
     'X-SECURITY-TOKEN': token,
@@ -434,15 +362,11 @@ def fetch_current_positions(cst, token):
 
     data_dict = json.loads(json_str)
 
-    if data_dict.get('positions'):
-        positions = data_dict['positions']
-    else:
-        print("Erreur de récupération des positions")
-        positions = []
+    positions = data_dict.get('positions', [])
 
     return positions
 
-if __name__ == "__main__":
+def main():
     auth = get_connection_token()
     cst = auth['CST']
     token = auth["Token"]
@@ -456,6 +380,8 @@ if __name__ == "__main__":
 
     current_acc = switch_active_account(cst, token, acc_id)
 
+    leverage = get_account_leverage(cst, token)
+
     ### Initialisation
     # On récupère les dernières candles pour pouvoir calculer le RSI
     candles = get_last_candles(cst, token, candle_number=RSI_PERIOD + 2) # +2 car on va calculer 2 RSI, donc enlever une candle au tableau. normalement c'est +1.
@@ -468,22 +394,24 @@ if __name__ == "__main__":
     # On extrait les prix de cloture des candles récupérées
     closes = extract_close_prices(candles)
     previous_closes = list(closes) # RSI - 1
-    previous_previous_closes = list(closes) # RSI - 2
+    # previous_previous_closes = list(closes) # RSI - 2
 
     # Calcul du dernier RSI
     previous_closes.pop(0) # On supprime le 1er élément pour ne garder que RSI_PERIOD + 1 (14) candles
     avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_closes, RSI_PERIOD)
-    previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
+    # previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
 
     # calcul de l'avant dernier rsi
-    previous_previous_closes.pop(-1) # On supprime le dernier élément pour ne garder que RSI_PERIOD + 1 (14) candles
-    avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_previous_closes, RSI_PERIOD)
-    previous_previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
+    # previous_previous_closes.pop(-1) # On supprime le dernier élément pour ne garder que RSI_PERIOD + 1 (14) candles
+    # avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_previous_closes, RSI_PERIOD)
+    # previous_previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
 
     # Initialisation avant le while True
     previous_timestamp = candles[-1]['snapshotTime']
     previous_close = closes[-1]
 
+    rsi_cross_low = False
+    rsi_cross_high = False
 
     print(f"Début du process : {datetime.datetime.now()}")
     while True:
@@ -508,7 +436,6 @@ if __name__ == "__main__":
         # Informations sur le compte
         acc_info = get_account_info(cst, token)
         acc_id = acc_info["id"]
-        leverage = get_account_leverage(cst, token)
         balance_dispo = acc_info["balancedispo"]
 
         # Sommes nous en position ?
@@ -517,56 +444,83 @@ if __name__ == "__main__":
         if positions == []:
             # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
 
+            # déclencheurs RSI
+            if current_rsi < RSI_LOW:
+                rsi_cross_low = True
+
+            if current_rsi > RSI_HIGH:
+                rsi_cross_high = True
+
+            # reinitialisation si fausse alerte
+            if current_rsi > 50:
+                rsi_cross_low = False
+            else:
+                rsi_cross_high = False
+
             # RSI vient de croiser sa borne supérieure ?
-            if (previous_previous_rsi > 70) and (previous_rsi < 70) and (current_rsi < previous_rsi):
+            if rsi_cross_high and (current_rsi < 65):
                 print("SELL")
                 deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
 
                 if deal_id != None:
                     trade_history.append({"deal_id": deal_id,
-                                          "risk_amount": acc_info['balancetotale'] * 0.05
+                                          "risk_amount": acc_info['balancetotale'] * QTE_LOSS
                                           })  
+                    
+                    alerte(f"SELL {TICKER}", f"SELL effectué à {datetime.datetime.now()}")
                 else: 
                     print("Erreur d'ouverture de trade.")
+                    alerte("EXCEPTION", "Erreur d'ouverture de trade.")
             # RSI vient de croiser sa borne inférieure ?
-            elif (previous_previous_rsi < 30) and (previous_rsi > 30) and (current_rsi > previous_rsi):
+            elif rsi_cross_low and (current_rsi > 35):
                 print("BUY")
                 deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
 
                 if deal_id != None:
                     trade_history.append({"deal_id": deal_id,
-                                          "risk_amount": acc_info['balancetotale'] * 0.05
+                                          "risk_amount": acc_info['balancetotale'] * QTE_LOSS
                                           })
+                    alerte(f"BUY {TICKER}", f"BUY effectué à {datetime.datetime.now()}")
                 else: 
                     print("Erreur d'ouverture de trade.")
+                    alerte("EXCEPTION", "Erreur d'ouverture de trade.")
             else:
                 print(f"Pas de trade en cours. RSI : {current_rsi}")
         else:
             position = positions[0] # 1 trade à la fois
 
             try:
-                # stop loss : 5% de la balance totale au moment ou j'ai ouvert le trade
-                stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empèche donc de trader à la main sur ce compte
+                # stop loss : 3% de la balance totale au moment ou j'ai ouvert le trade
+                stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
             except IndexError as e:
                 # Il y a eu un problème, on va utiliser une solution pas top mais on continue
                 print("IndexError.")
-                stoploss = acc_info['balancetotale'] * 0.05
+                stoploss = acc_info['balancetotale'] * QTE_LOSS
                 
             # Si la condition de stop loss est atteinte
             if position['position']['upl'] <= -stoploss: # en EUR
                 # On ferme la position
                 print(f"STOP LOSS. Perte : {position['position']['upl']}")
                 deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                rsi_cross_high = False
+                rsi_cross_low = False
 
                 if deal_ref == None:
                     print("Erreur de fermeture de trade.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade.")
+                else:
+                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {position['position']['upl']}")
             else:
                 # Sinon rien 
                 print(f"Etat du trade: {position['position']['upl']} EUR")
 
         # Initialisation pour la prochaine candle
         previous_timestamp = candle['snapshotTime']
-        previous_previous_rsi = previous_rsi
-        previous_rsi = current_rsi
+        # previous_previous_rsi = previous_rsi
+        # previous_rsi = current_rsi
         previous_close = close
 
+if __name__ == "__main__":
+    main()

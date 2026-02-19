@@ -4,7 +4,7 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi
 import numpy as np
 
-DATA_FILE = "../data/XAU_1m_2021_to_2026.csv"
+DATA_FILE = "../data/XAU_1m_2024.csv"
 
 def main():
     df = pd.read_csv(DATA_FILE, sep=";")
@@ -50,7 +50,7 @@ def main():
     print(f"Balance finale        : {results['final_balance']:.2f} €")
     print(f"PNL total             : {results['total_pnl']:.2f} €")
     print(f"Nombre de trades      : {results['number_of_trades']}")
-    print(f"Moyenne du nombre de trades : {results['number_of_trades']/92} trades/jour")
+    print(f"Moyenne du nombre de trades : {results['number_of_trades']/365} trades/jour")
     print("-----------------------------------")
     # print("Liste des trades (PNL unitaire) :")
     # for i, pnl in enumerate(results["all_trades"], start=1):

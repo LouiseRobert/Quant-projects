@@ -394,17 +394,10 @@ def alternative_main():
     # On extrait les prix de cloture des candles récupérées
     closes = extract_close_prices(candles)
     previous_closes = list(closes) # RSI - 1
-    # previous_previous_closes = list(closes) # RSI - 2
 
     # Calcul du dernier RSI
     previous_closes.pop(0) # On supprime le 1er élément pour ne garder que RSI_PERIOD + 1 (14) candles
     avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_closes, RSI_PERIOD)
-    # previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
-
-    # calcul de l'avant dernier rsi
-    # previous_previous_closes.pop(-1) # On supprime le dernier élément pour ne garder que RSI_PERIOD + 1 (14) candles
-    # avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_previous_closes, RSI_PERIOD)
-    # previous_previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
 
     # Initialisation avant le while True
     previous_timestamp = candles[-1]['snapshotTime']
@@ -428,6 +421,7 @@ def alternative_main():
             continue
 
         current_candle = candle[-2]
+        print(current_candle)
 
         # si on est sur une nouvelle candle
         if current_candle['snapshotTime'] != previous_timestamp :
@@ -500,36 +494,8 @@ def alternative_main():
                         print("Erreur d'ouverture de trade.")
                         alerte("EXCEPTION", "Erreur d'ouverture de trade.")
                 else:
-                    print(f"Pas de trade en cours. RSI : {current_rsi}")
+                    print(f"Pas de trade en cours.")
             else:
-                # position = positions[0] # 1 trade à la fois
-
-                # try:
-                #     # stop loss : 3% de la balance totale au moment ou j'ai ouvert le trade
-                #     stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
-                # except IndexError as e:
-                #     # Il y a eu un problème, on va utiliser une solution pas top mais on continue
-                #     print("IndexError.")
-                #     stoploss = acc_info['balancetotale'] * QTE_LOSS
-                    
-                # # Si la condition de stop loss est atteinte
-                # if position['position']['upl'] <= -stoploss: # en EUR
-                #     # On ferme la position
-                #     print(f"STOP LOSS. Perte : {position['position']['upl']}")
-                #     deal_ref = close_position(cst, token, position['position']['dealId'])
-                    
-                #     # réinitialisation des déclencheurs
-                #     rsi_cross_high = False
-                #     rsi_cross_low = False
-
-                #     if deal_ref == None:
-                #         print("Erreur de fermeture de trade.")
-                #         alerte("EXCEPTION", "Erreur de fermeture de trade.")
-                #     else:
-                #         alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {position['position']['upl']}")
-                # else:
-                #     # Sinon rien 
-                #     print(f"Etat du trade: {position['position']['upl']} EUR")
                 pass
 
             # Initialisation pour la prochaine candle
@@ -546,8 +512,16 @@ def alternative_main():
                 stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
             except IndexError as e:
                 # Il y a eu un problème, on va utiliser une solution pas top mais on continue
-                print("IndexError.")
+                print("IndexError Stop loss.")
                 stoploss = acc_info['balancetotale'] * QTE_LOSS
+
+            try:
+                # takeprofit  : 0.65% de la balance totale au moment ou j'ai ouvert le trade
+                takeprofit = acc_info['balancetotale'] * QTE_TP
+            except IndexError as e:
+                # Il y a eu un problème, on va utiliser une solution pas top mais on continue
+                print("IndexError Take profit.")
+                takeprofit = 0.5
                 
             # Si la condition de stop loss est atteinte
             if position['position']['upl'] <= -stoploss: # en EUR
@@ -559,11 +533,31 @@ def alternative_main():
                 rsi_cross_high = False
                 rsi_cross_low = False
 
+                acc_info = get_account_info(cst, token)
+
                 if deal_ref == None:
-                    print("Erreur de fermeture de trade.")
-                    alerte("EXCEPTION", "Erreur de fermeture de trade.")
+                    print("Erreur de fermeture de trade stop loss.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade stop loss.")
                 else:
-                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {position['position']['upl']}")
+                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {position['position']['upl']} \n Balance : {acc_info['balancetotale']}")
+            
+            # Si la condition de takeprofit est atteinte
+            elif position['position']['upl'] >= takeprofit: # en EUR
+                # On ferme la position
+                print(f"TAKE PROFIT. Gain : {position['position']['upl']}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                rsi_cross_high = False
+                rsi_cross_low = False
+
+                acc_info = get_account_info(cst, token)
+
+                if deal_ref == None:
+                    print("Erreur de fermeture de trade take profit.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade take profit.")
+                else:
+                    alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.datetime.now()} \n Gain : {position['position']['upl']} \n Balance : {acc_info['balancetotale']}")
             else:
                 # Sinon rien 
                 print(f"Etat du trade: {position['position']['upl']} EUR")
@@ -603,12 +597,6 @@ def main():
     # Calcul du dernier RSI
     previous_closes.pop(0) # On supprime le 1er élément pour ne garder que RSI_PERIOD + 1 (14) candles
     avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_closes, RSI_PERIOD)
-    # previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
-
-    # calcul de l'avant dernier rsi
-    # previous_previous_closes.pop(-1) # On supprime le dernier élément pour ne garder que RSI_PERIOD + 1 (14) candles
-    # avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_previous_closes, RSI_PERIOD)
-    # previous_previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
 
     # Initialisation avant le while True
     previous_timestamp = candles[-1]['snapshotTime']
@@ -728,4 +716,6 @@ def main():
         previous_close = close
 
 if __name__ == "__main__":
-    main()
+    # main()
+
+    alternative_main()

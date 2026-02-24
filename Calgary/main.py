@@ -13,11 +13,11 @@ CALGARY_ACCOUNT_NAME = "Calgary"
 
 ### PARAMETRES RSI
 RSI_PERIOD = 13
-RSI_HIGH = 75
-RSI_LOW = 25
+RSI_HIGH = 72
+RSI_LOW = 28
 
-QTE_LOSS = 0.03 # 3% de perte
-QTE_TP = 0.0085 # 0.85% de gain si TP
+QTE_LOSS = 0.045 # 5% de perte
+QTE_TP = 0.0065 # 0.85% de gain si TP
     
 def get_connection_token():
     """
@@ -466,7 +466,7 @@ def main():
                     trade_history.append({"deal_id": deal_id,
                                           "risk_amount": acc_info['balancetotale'] * QTE_LOSS
                                           })  
-                    
+                    rsi_cross_high = False                    
                     alerte(f"SELL {TICKER}", f"SELL effectué à {datetime.datetime.now()}")
                 else: 
                     print("Erreur d'ouverture de trade.")
@@ -480,6 +480,7 @@ def main():
                     trade_history.append({"deal_id": deal_id,
                                           "risk_amount": acc_info['balancetotale'] * QTE_LOSS
                                           })
+                    rsi_cross_low = False
                     alerte(f"BUY {TICKER}", f"BUY effectué à {datetime.datetime.now()}")
                 else: 
                     print("Erreur d'ouverture de trade.")

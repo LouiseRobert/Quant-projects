@@ -1,5 +1,5 @@
 
-BALANCE = 50 # Balance totale du compte
+BALANCE = 100 # Balance totale du compte
 LEVERAGE = 20 # Levier
 SPREAD = 0.4 # dollars
 
@@ -146,8 +146,8 @@ class Backtester:
             
         half_spread = SPREAD/2
         # SL / TP fixés en € sur la balance totale
-        loss_amount = 0.03 * balance_before_trade
-        profit_amount = 0.0085 * balance_before_trade
+        loss_amount = 0.05 * balance_before_trade
+        profit_amount = 0.0038 * balance_before_trade
 
         # prix de SL / TP correct
         if self.position == "long":

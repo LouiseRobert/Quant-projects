@@ -366,6 +366,210 @@ def fetch_current_positions(cst, token):
 
     return positions
 
+def alternative_main():
+    auth = get_connection_token()
+    cst = auth['CST']
+    token = auth["Token"]
+
+    # Historique des trades
+    trade_history = []
+
+    # infos sur le compte Calgary:
+    acc_info = get_account_info(cst, token)
+    acc_id = acc_info["id"]
+
+    current_acc = switch_active_account(cst, token, acc_id)
+
+    leverage = get_account_leverage(cst, token)
+
+    ### Initialisation
+    # On récupère les dernières candles pour pouvoir calculer le RSI
+    candles = get_last_candles(cst, token, candle_number=RSI_PERIOD + 2) # +2 car on va calculer 2 RSI, donc enlever une candle au tableau. normalement c'est +1.
+
+    while candles is None:
+        print("Erreur dans la récupération des candles, attente de 5 secondes...")
+        time.sleep(5)
+        candles = get_last_candles(cst, token, candle_number=RSI_PERIOD + 2)
+
+    # On extrait les prix de cloture des candles récupérées
+    closes = extract_close_prices(candles)
+    previous_closes = list(closes) # RSI - 1
+    # previous_previous_closes = list(closes) # RSI - 2
+
+    # Calcul du dernier RSI
+    previous_closes.pop(0) # On supprime le 1er élément pour ne garder que RSI_PERIOD + 1 (14) candles
+    avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_closes, RSI_PERIOD)
+    # previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
+
+    # calcul de l'avant dernier rsi
+    # previous_previous_closes.pop(-1) # On supprime le dernier élément pour ne garder que RSI_PERIOD + 1 (14) candles
+    # avg_gain, avg_loss = compute_initial_avg_gain_loss(previous_previous_closes, RSI_PERIOD)
+    # previous_previous_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
+
+    # Initialisation avant le while True
+    previous_timestamp = candles[-1]['snapshotTime']
+    previous_close = closes[-1]
+
+    rsi_cross_low = False
+    rsi_cross_high = False
+    new_candle_available = False
+
+    print(f"Début du process : {datetime.datetime.now()}")
+    while True:
+
+        # Sommes nous en position ?
+        positions = fetch_current_positions(cst, token)
+
+        # Quand on passe à une nouvelle candle
+        candle = get_last_candles(cst, token, 2)
+
+        if candle is None or len(candle) < 2:
+            time.sleep(10)
+            continue
+
+        current_candle = candle[-2]
+
+        # si on est sur une nouvelle candle
+        if current_candle['snapshotTime'] != previous_timestamp :
+            new_candle_available = True
+        else:
+            new_candle_available = False
+
+        if new_candle_available:
+            # On récupère son prix moyen de cloture et on le compare au précédent
+            close = (current_candle['closePrice']['bid'] + current_candle['closePrice']['ask']) /2
+            delta = close - previous_close
+
+            gain = max(delta, 0)
+            loss = max(-delta, 0)
+
+            # Calcul du RSI courant
+            avg_gain = (avg_gain * (RSI_PERIOD - 1) + gain) / RSI_PERIOD
+            avg_loss = (avg_loss * (RSI_PERIOD - 1) + loss) / RSI_PERIOD
+
+            current_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
+            print(f"{datetime.datetime.now()} : RSI courant: {current_rsi}")
+
+            # Informations sur le compte
+            acc_info = get_account_info(cst, token)
+            acc_id = acc_info["id"]
+            balance_dispo = acc_info["balancedispo"]
+
+            if not positions:
+                # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
+
+                # déclencheurs RSI
+                if current_rsi < RSI_LOW:
+                    rsi_cross_low = True
+
+                if current_rsi > RSI_HIGH:
+                    rsi_cross_high = True
+
+                # reinitialisation si fausse alerte
+                if current_rsi > 50:
+                    rsi_cross_low = False
+                else:
+                    rsi_cross_high = False
+
+                # RSI vient de croiser sa borne supérieure ?
+                if rsi_cross_high and (current_rsi < 65):
+                    print("SELL")
+                    deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
+
+                    if deal_id != None:
+                        trade_history.append({"deal_id": deal_id,
+                                            "risk_amount": acc_info['balancetotale'] * QTE_LOSS
+                                            })  
+                        rsi_cross_high = False                    
+                        alerte(f"SELL {TICKER}", f"SELL effectué à {datetime.datetime.now()}")
+                    else: 
+                        print("Erreur d'ouverture de trade.")
+                        alerte("EXCEPTION", "Erreur d'ouverture de trade.")
+                # RSI vient de croiser sa borne inférieure ?
+                elif rsi_cross_low and (current_rsi > 35):
+                    print("BUY")
+                    deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
+
+                    if deal_id != None:
+                        trade_history.append({"deal_id": deal_id,
+                                            "risk_amount": acc_info['balancetotale'] * QTE_LOSS
+                                            })
+                        rsi_cross_low = False
+                        alerte(f"BUY {TICKER}", f"BUY effectué à {datetime.datetime.now()}")
+                    else: 
+                        print("Erreur d'ouverture de trade.")
+                        alerte("EXCEPTION", "Erreur d'ouverture de trade.")
+                else:
+                    print(f"Pas de trade en cours. RSI : {current_rsi}")
+            else:
+                # position = positions[0] # 1 trade à la fois
+
+                # try:
+                #     # stop loss : 3% de la balance totale au moment ou j'ai ouvert le trade
+                #     stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
+                # except IndexError as e:
+                #     # Il y a eu un problème, on va utiliser une solution pas top mais on continue
+                #     print("IndexError.")
+                #     stoploss = acc_info['balancetotale'] * QTE_LOSS
+                    
+                # # Si la condition de stop loss est atteinte
+                # if position['position']['upl'] <= -stoploss: # en EUR
+                #     # On ferme la position
+                #     print(f"STOP LOSS. Perte : {position['position']['upl']}")
+                #     deal_ref = close_position(cst, token, position['position']['dealId'])
+                    
+                #     # réinitialisation des déclencheurs
+                #     rsi_cross_high = False
+                #     rsi_cross_low = False
+
+                #     if deal_ref == None:
+                #         print("Erreur de fermeture de trade.")
+                #         alerte("EXCEPTION", "Erreur de fermeture de trade.")
+                #     else:
+                #         alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {position['position']['upl']}")
+                # else:
+                #     # Sinon rien 
+                #     print(f"Etat du trade: {position['position']['upl']} EUR")
+                pass
+
+            # Initialisation pour la prochaine candle
+            previous_timestamp = current_candle['snapshotTime']
+            # previous_previous_rsi = previous_rsi
+            # previous_rsi = current_rsi
+            previous_close = close
+        
+        if positions:
+            position = positions[0] # 1 trade à la fois
+
+            try:
+                # stop loss : 3% de la balance totale au moment ou j'ai ouvert le trade
+                stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
+            except IndexError as e:
+                # Il y a eu un problème, on va utiliser une solution pas top mais on continue
+                print("IndexError.")
+                stoploss = acc_info['balancetotale'] * QTE_LOSS
+                
+            # Si la condition de stop loss est atteinte
+            if position['position']['upl'] <= -stoploss: # en EUR
+                # On ferme la position
+                print(f"STOP LOSS. Perte : {position['position']['upl']}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                rsi_cross_high = False
+                rsi_cross_low = False
+
+                if deal_ref == None:
+                    print("Erreur de fermeture de trade.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade.")
+                else:
+                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {position['position']['upl']}")
+            else:
+                # Sinon rien 
+                print(f"Etat du trade: {position['position']['upl']} EUR")
+
+        time.sleep(10)
+
 def main():
     auth = get_connection_token()
     cst = auth['CST']

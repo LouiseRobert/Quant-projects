@@ -39,7 +39,7 @@ class Backtester:
         low = candle["Low"]
         rsi = candle["RSI"]
         rsi_1 = candle["RSI-1"]
-        datetime = candle["datetime"]
+        datetime = candle["horodatage"]
 
         # Position en cours ?
         if self.position is None:
@@ -65,14 +65,14 @@ class Backtester:
                 self.rsi_cross_high = False
 
             # === OUVERTURE DE POSITION SHORT ===
-            if shouldisell == True:
+            if shouldisell == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)):
                 direction = "short"
 
                 exec_price = self.get_execution_price(close, direction, "entry")
                 self.open_position(exec_price, direction)
 
             # === OUVERTURE DE POSITION LONG ===
-            elif shouldibuy == True:
+            elif shouldibuy == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)):
                 direction = "long"
 
                 exec_price = self.get_execution_price(close, direction, "entry")

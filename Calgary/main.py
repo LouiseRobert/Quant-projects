@@ -17,7 +17,7 @@ RSI_HIGH = 72
 RSI_LOW = 28
 
 QTE_LOSS = 0.045 # 5% de perte
-QTE_TP = 0.0065 # 0.85% de gain si TP
+QTE_TP = 0.0038 # 0.85% de gain si TP
     
 def get_connection_token():
     """
@@ -287,7 +287,6 @@ def create_position(cst, token, direction, available_balance, leverage):
     "size": size, # genre 0.3 
     "guaranteedStop": True, # True pour moi car pas le choix
     "stopAmount": round(available_balance*0.47), # Quantité à perdre si SL 
-    "profitAmount": round(available_balance*QTE_TP) # Quantité à gagner si TP
     })
     headers = {
     'X-SECURITY-TOKEN': token,
@@ -444,12 +443,16 @@ def alternative_main():
             current_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
             print(f"{datetime.datetime.now()} : RSI courant: {current_rsi}")
 
+            # Récupération du datetime
+            candletime = datetime.datetime.fromisoformat(current_candle["snapshotTimeUTC"])
+
             # Informations sur le compte
             acc_info = get_account_info(cst, token)
             acc_id = acc_info["id"]
             balance_dispo = acc_info["balancedispo"]
 
-            if not positions:
+            # Si on a pas de position en cours ET qu'il est avant 22h30
+            if not positions and candletime.time() <= datetime.time(22, 30):
                 # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
 
                 # déclencheurs RSI

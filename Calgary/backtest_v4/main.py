@@ -4,7 +4,7 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi
 import numpy as np
 
-DATA_FILE = "../data/XAU_1m_2025.csv"
+DATA_FILE = "../data/XAU_1m_2022.csv"
 
 def main():
     df = pd.read_csv(DATA_FILE, sep=";")
@@ -17,6 +17,8 @@ def main():
 
     # Conversion en timestamp Unix (secondes)
     df["timestamp"] = df["datetime"].astype("int64") # 10**9
+
+    df["horodatage"] = df["datetime"]
 
     # Mettre le datetime en index
     df = df.set_index("datetime")
@@ -42,6 +44,13 @@ def main():
 
     results = bt.run()
 
+    positifs = 0
+    negatifs = 0
+    for trade in results["all_trades"]:
+        if trade >= 0:
+            positifs += 1
+        else:
+            negatifs += 1
     # ================================
     #     AFFICHAGE DES RESULTATS
     # ================================
@@ -50,7 +59,10 @@ def main():
     print(f"Balance finale        : {results['final_balance']:.2f} €")
     print(f"PNL total             : {results['total_pnl']:.2f} €")
     print(f"Nombre de trades      : {results['number_of_trades']}")
-    print(f"Moyenne du nombre de trades : {results['number_of_trades']/22} trades/jour")
+    print(f"Nombre de trades gagnants   : {positifs}")
+    print(f"Nombre de trades perdants   : {negatifs}")
+    print(f"Winrate   : {((positifs/results['number_of_trades'])*100):.2f}%")
+    print(f"Moyenne du nombre de trades : {results['number_of_trades']/260} trades/jour")
     print("-----------------------------------")
     # print("Liste des trades (PNL unitaire) :")
     # for i, pnl in enumerate(results["all_trades"], start=1):

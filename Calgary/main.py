@@ -13,11 +13,11 @@ CALGARY_ACCOUNT_NAME = "Calgary"
 
 ### PARAMETRES RSI
 RSI_PERIOD = 13
-RSI_HIGH = 72
-RSI_LOW = 28
+RSI_HIGH = 75
+RSI_LOW = 25
 
-QTE_LOSS = 0.045 # 5% de perte
-QTE_TP = 0.0038 # 0.85% de gain si TP
+QTE_LOSS = 0.03 # 3% de perte
+QTE_TP = 0.0065 # 0.65% de gain si TP
     
 def get_connection_token():
     """

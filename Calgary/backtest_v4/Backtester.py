@@ -3,6 +3,9 @@ BALANCE = 100 # Balance totale du compte
 LEVERAGE = 20 # Levier
 SPREAD = 0.4 # dollars
 
+LOSS_RATE = 0.03
+PROFIT_RATE = 0.0065
+
 class Backtester: 
     def __init__(self, df, balance=BALANCE, leverage=LEVERAGE): 
         """
@@ -46,7 +49,7 @@ class Backtester:
             #### Conditions de long
             # Si le RSI passe de inférieur à 30 à supérieur à 30 et que le RSI actuel est < au précédent
             # rsi_long_ok = (rsi_2 < 30) and (rsi_1 > 30) and (rsi > rsi_1)
-            if rsi < 25:
+            if rsi < 24:
                 self.rsi_cross_low = True
             # Alors on considère qu'on est en position longue
             shouldibuy = self.rsi_cross_low and (rsi > 35)
@@ -54,7 +57,7 @@ class Backtester:
             #### Conditions de short
             # Si le RSI croise la barre des 70 par le dessus 
             # rsi_short_ok = (rsi_2 > 70) and (rsi_1 < 70) and (rsi < rsi_1)
-            if rsi > 75:
+            if rsi > 76:
                 self.rsi_cross_high = True
             # Alors on considère qu'on est en position short
             shouldisell = self.rsi_cross_high and (rsi < 65)
@@ -143,8 +146,8 @@ class Backtester:
             
         half_spread = SPREAD/2
         # SL / TP fixés en € sur la balance totale
-        loss_amount = 0.05 * balance_before_trade
-        profit_amount = 0.0038 * balance_before_trade
+        loss_amount = LOSS_RATE * balance_before_trade
+        profit_amount = PROFIT_RATE * balance_before_trade
 
         # prix de SL / TP correct
         if self.position == "long":

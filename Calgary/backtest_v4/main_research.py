@@ -89,42 +89,34 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     #     AFFICHAGE DES RESULTATS
     # ================================
 
-    print("===== BACKTEST TERMINE =====")
-    print(f"Balance finale        : {results['final_balance']:.2f} €")
-    print(f"PNL total             : {results['total_pnl']:.2f} €")
-    print(f"Nombre de trades      : {results['number_of_trades']}")
-    print(f"Nombre de trades gagnants   : {positifs}")
-    print(f"Nombre de trades perdants   : {negatifs}")
-    print(f"Winrate                     : {((positifs/results['number_of_trades'])*100):.2f}%")
-    print(f"Average win                 : {avg_win:.2f}")
-    print(f"Average loss                : {avg_loss:.2f}")
-    print(f"Profit factor               : {profit_factor:.2f}")
-    print(f"Max drawdown                : {max_dd_percent:.2f} %")
-    print(f"Espérance                   : {(((positifs/results['number_of_trades'])) * avg_win) + ((1-((positifs/results['number_of_trades']))) * avg_loss):.2f}")
-    print(f"Moyenne du nombre de trades : {results['number_of_trades']/260:.2f} trades/jour")
-    print("-----------------------------------")
+    # print("===== BACKTEST TERMINE =====")
+    # print(f"Balance finale        : {results['final_balance']:.2f} €")
+    # print(f"PNL total             : {results['total_pnl']:.2f} €")
+    # print(f"Nombre de trades      : {results['number_of_trades']}")
+    # print(f"Nombre de trades gagnants   : {positifs}")
+    # print(f"Nombre de trades perdants   : {negatifs}")
+    # print(f"Winrate                     : {((positifs/results['number_of_trades'])*100):.2f}%")
+    # print(f"Average win                 : {avg_win:.2f}")
+    # print(f"Average loss                : {avg_loss:.2f}")
+    # print(f"Profit factor               : {profit_factor:.2f}")
+    # print(f"Max drawdown                : {max_dd_percent:.2f} %")
+    # print(f"Espérance                   : {(((positifs/results['number_of_trades'])) * avg_win) + ((1-((positifs/results['number_of_trades']))) * avg_loss):.2f}")
+    # print(f"Moyenne du nombre de trades : {results['number_of_trades']/260:.2f} trades/jour")
+    # print("-----------------------------------")
 
-    final_balances, drawdowns = monte_carlo_simulation(results["all_trades_pct"])
+    print(f"{tp_rate:.2f};{sl_rate};{results['final_balance']:.2f};{(((positifs/results['number_of_trades'])) * avg_win) + ((1-((positifs/results['number_of_trades']))) * avg_loss):.2f};{profit_factor:.2f};{results['total_pnl']:.2f};{results['number_of_trades']};{positifs};{negatifs};{((positifs/results['number_of_trades'])*100):.2f};{avg_win:.2f};{avg_loss:.2f};{max_dd_percent:.2f};{results['number_of_trades']/260:.2f}")
 
-    plt.figure(figsize=(12, 5))
-    plt.plot(bt.balance_history, label="Balance", linewidth=1.5)
-    plt.title("Évolution de la balance pendant le backtest")
-    plt.xlabel("Nombre de candles")
-    plt.ylabel("Balance (€)")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    # final_balances, drawdowns = monte_carlo_simulation(results["all_trades_pct"])
+
 
 if __name__ == "__main__":
-    main()
-    # i = 0.002
+    tp = 0.001
+    sl = 0.005
+    print(f"Take profit;Stop loss;Balance finale;Esperance;Profit factor;PNL Total;Nombre de trades;Nombre de positifs;Nombre de negatifs;Winrate;Montant moyen gagne;Montant moyen perdu;Drawdown max;Nombre de trades journalier")
 
-    # while i <= 0.004:
-    #     print(f"____________________ Profit rate : {i*100:.2f}% ____________________")
-    #     main(i)
+    while tp <= 0.025:
+        # print(f"____________________ Profit rate : {tp*100:.2f}% ____________________")
+        main(tp_rate=tp, sl_rate=sl)
 
-    #     i += 0.0001
-
-
-    
+        tp += 0.0005
+        sl += 0.00025

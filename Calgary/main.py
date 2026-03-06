@@ -13,11 +13,11 @@ CALGARY_ACCOUNT_NAME = "Calgary"
 
 ### PARAMETRES RSI
 RSI_PERIOD = 13
-RSI_HIGH = 75
-RSI_LOW = 25
+RSI_HIGH = 72
+RSI_LOW = 28
 
-QTE_LOSS = 0.03 # 3% de perte
-QTE_TP = 0.0065 # 0.65% de gain si TP
+QTE_LOSS = 0.05 # 5% de perte
+QTE_TP = 0.0029 # 0.29% de gain si TP
     
 def get_connection_token():
     """
@@ -469,7 +469,7 @@ def alternative_main():
                     rsi_cross_high = False
 
                 # RSI vient de croiser sa borne supérieure ?
-                if rsi_cross_high and (current_rsi < 65):
+                if rsi_cross_high and (current_rsi < 70):
                     print("SELL")
                     deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
 
@@ -483,7 +483,7 @@ def alternative_main():
                         print("Erreur d'ouverture de trade.")
                         alerte("EXCEPTION", "Erreur d'ouverture de trade.")
                 # RSI vient de croiser sa borne inférieure ?
-                elif rsi_cross_low and (current_rsi > 35):
+                elif rsi_cross_low and (current_rsi > 30):
                     print("BUY")
                     deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
 

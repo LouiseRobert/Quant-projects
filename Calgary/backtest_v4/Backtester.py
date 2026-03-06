@@ -3,11 +3,8 @@ BALANCE = 100 # Balance totale du compte
 LEVERAGE = 20 # Levier
 SPREAD = 0.4 # dollars
 
-LOSS_RATE = 0.03
-PROFIT_RATE = 0.0065
-
 class Backtester: 
-    def __init__(self, df, balance=BALANCE, leverage=LEVERAGE): 
+    def __init__(self, df, profit_rate, loss_rate, balance=BALANCE, leverage=LEVERAGE): 
         """
         Docstring for __init__
         
@@ -21,7 +18,8 @@ class Backtester:
         self.balance = balance 
         self.balance_history = [self.balance]
         self.leverage = leverage 
-        # self.margin_per_trade = self.balance / 2 # Calcul de la valeur notionnelle totale contrôlée 
+        self.profit_rate = profit_rate
+        self.loss_rate = loss_rate
         self.margin_ratio = 0.5
         self.margin_used = None
         self.position_size = None
@@ -32,6 +30,7 @@ class Backtester:
         self.takeprofit = None # Le Take profit est fixe et calculé à la prise de position 
         self.units = None # quantité d'or contrôlée 
         self.trades = [] # log des trades cloturés
+        self.trades_pct = []
 
         self.rsi_cross_low = False
         self.rsi_cross_high = False
@@ -84,21 +83,15 @@ class Backtester:
         else:
             ### Conditions de vente de la position longue
 
-            # Si le RSI croise la barre des 70 par le dessus 
-            # rsi_sell_ok = (rsi_1 > 70) and (rsi < 70)
-            # Et que le prix (close) a atteint le take profit définit à l'achat
             price_sell_ok = high >= self.takeprofit
             # Alors on cloture la position longue
             take_profit_long = price_sell_ok
 
             ### conditions d'achat de la position short 
 
-            # Si le RSI croise la barre des 30 par le dessous 
-            rsi_buy_ok = (rsi_1 < 30) and (rsi > 30)
-            # Et que le prix a atteint le take profit 
             price_buy_ok = low <= self.takeprofit
             # Alors on cloture la position short
-            take_profit_short = rsi_buy_ok or price_buy_ok
+            take_profit_short = price_buy_ok
 
             if self.position == "short":
                 exec_price = self.get_execution_price(high, "long", "exit") # prix d'execution de sortie du short au prix ASK
@@ -146,8 +139,8 @@ class Backtester:
             
         half_spread = SPREAD/2
         # SL / TP fixés en € sur la balance totale
-        loss_amount = LOSS_RATE * balance_before_trade
-        profit_amount = PROFIT_RATE * balance_before_trade
+        loss_amount = self.loss_rate * balance_before_trade
+        profit_amount = self.profit_rate * balance_before_trade
 
         # prix de SL / TP correct
         if self.position == "long":
@@ -181,7 +174,7 @@ class Backtester:
 
         self.close_position(pnl)
 
-        print(f"{datetime} --- {direction} {label} --- prix d'entree : {self.entry_price} --- {self.balance} ---")
+        # print(f"{datetime} --- {direction} {label} --- prix d'entree : {self.entry_price} --- {self.balance} ---")
 
         # Reset
         self.reset()
@@ -216,7 +209,10 @@ class Backtester:
         # on débloque l'agrent de la balance
         self.balance += self.margin_used # marge restituée
         self.balance += pnl # pnl du trade
+        pct_pnl = pnl/self.balance
+
         self.trades.append(pnl)
+        self.trades_pct.append(pct_pnl)
         
     def reset(self):
         """
@@ -256,5 +252,6 @@ class Backtester:
             "final_balance": self.balance,
             "total_pnl": sum(self.trades),
             "number_of_trades": len(self.trades),
-            "all_trades": self.trades
+            "all_trades": self.trades,
+            "all_trades_pct": self.trades_pct
         }

@@ -1,3 +1,6 @@
+import numpy as np
+import random
+
 def rsi(close_series, window = 13):
     """
     Fonction de calcul du RSI.
@@ -40,3 +43,45 @@ def bollinger_bands(close_series, period=25, num_std=2):
     lower = ma - num_std * std
     
     return ma, upper, lower
+
+def monte_carlo_simulation(all_trades, start_balance=100, simulations=1000):
+
+    final_balances = []
+    max_drawdowns = []
+
+    for _ in range(simulations):
+
+        trades = all_trades.copy()
+        random.shuffle(trades)
+
+        balance = start_balance
+        peak = start_balance
+        max_dd = 0
+
+        for trade in trades:
+
+            balance *= (1 + trade)
+
+            if balance > peak:
+                peak = balance
+
+            drawdown = (peak - balance) / peak * 100
+
+            if drawdown > max_dd:
+                max_dd = drawdown
+
+        final_balances.append(balance)
+        max_drawdowns.append(max_dd)
+
+    print("===== MONTE CARLO =====")
+    print("Simulations :", simulations)
+    print()
+    print("Balance finale moyenne :", round(np.mean(final_balances),2))
+    print("Balance finale médiane :", round(np.median(final_balances),2))
+    print("Pire balance finale :", round(min(final_balances),2))
+    print("Meilleure balance finale :", round(max(final_balances),2))
+    print()
+    print("Drawdown moyen :", round(np.mean(max_drawdowns),2), "%")
+    print("Pire drawdown :", round(max(max_drawdowns),2), "%")
+
+    return final_balances, max_drawdowns

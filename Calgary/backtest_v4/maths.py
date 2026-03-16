@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import pandas as pd
 
 def rsi(close_series, window = 13):
     """
@@ -60,7 +61,7 @@ def monte_carlo_simulation(all_trades, start_balance=100, simulations=1000):
 
         for trade in trades:
 
-            balance *= (1 + trade)
+            balance *= (1 + trade["PNL_pct"])
 
             if balance > peak:
                 peak = balance
@@ -85,3 +86,15 @@ def monte_carlo_simulation(all_trades, start_balance=100, simulations=1000):
     print("Pire drawdown :", round(max(max_drawdowns),2), "%")
 
     return final_balances, max_drawdowns
+
+def compute_atr(high_series, low_series, close_series, period=14):
+
+    tr1 = high_series - low_series
+    tr2 = abs(high_series - close_series.shift(1))
+    tr3 = abs(low_series - close_series.shift(1))
+
+    true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+    atr = true_range.rolling(period).mean()
+
+    return atr

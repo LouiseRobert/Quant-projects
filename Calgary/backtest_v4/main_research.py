@@ -50,15 +50,15 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     positifs = 0
     negatifs = 0
     for trade in results["all_trades"]:
-        if trade >= 0:
+        if trade["PNL"] >= 0:
             positifs += 1
         else:
             negatifs += 1
 
-    wins = [t for t in results["all_trades"] if t > 0]
+    wins = [t["PNL"] for t in results["all_trades"] if t["PNL"] > 0]
     avg_win = sum(wins) / len(wins)
 
-    losses = [t for t in results["all_trades"] if t < 0]
+    losses = [t["PNL"] for t in results["all_trades"] if t["PNL"] < 0]
     avg_loss = sum(losses) / len(losses)  # sera négatif
 
     total_gain = sum(wins)
@@ -70,7 +70,7 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     equity_curve = []
 
     for t in results["all_trades"]:
-        equity += t
+        equity += t["PNL"]
         equity_curve.append(equity)
 
     peak = 100
@@ -104,19 +104,19 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     # print(f"Moyenne du nombre de trades : {results['number_of_trades']/260:.2f} trades/jour")
     # print("-----------------------------------")
 
-    print(f"{tp_rate:.2f};{sl_rate};{results['final_balance']:.2f};{(((positifs/results['number_of_trades'])) * avg_win) + ((1-((positifs/results['number_of_trades']))) * avg_loss):.2f};{profit_factor:.2f};{results['total_pnl']:.2f};{results['number_of_trades']};{positifs};{negatifs};{((positifs/results['number_of_trades'])*100):.2f};{avg_win:.2f};{avg_loss:.2f};{max_dd_percent:.2f};{results['number_of_trades']/260:.2f}")
+    print(f"{tp_rate:.5f};{sl_rate:.5f};{results['final_balance']:.2f};{(((positifs/results['number_of_trades'])) * avg_win) + ((1-((positifs/results['number_of_trades']))) * avg_loss):.2f};{profit_factor:.2f};{results['total_pnl']:.2f};{results['number_of_trades']};{positifs};{negatifs};{((positifs/results['number_of_trades'])*100):.2f};{avg_win:.2f};{avg_loss:.2f};{max_dd_percent:.2f};{results['number_of_trades']/260:.2f}")
 
-    # final_balances, drawdowns = monte_carlo_simulation(results["all_trades_pct"])
+    # final_balances, drawdowns = monte_carlo_simulation(results["all_trades"])
 
-
+            
 if __name__ == "__main__":
-    tp = 0.001
-    sl = 0.005
-    print(f"Take profit;Stop loss;Balance finale;Esperance;Profit factor;PNL Total;Nombre de trades;Nombre de positifs;Nombre de negatifs;Winrate;Montant moyen gagne;Montant moyen perdu;Drawdown max;Nombre de trades journalier")
 
-    while tp <= 0.025:
-        # print(f"____________________ Profit rate : {tp*100:.2f}% ____________________")
-        main(tp_rate=tp, sl_rate=sl)
+    print("Take profit;Stop loss;Balance finale;Esperance;Profit factor;PNL Total;Nombre de trades;Nombre de positifs;Nombre de negatifs;Winrate;Montant moyen gagne;Montant moyen perdu;Drawdown max;Nombre de trades journalier")
 
-        tp += 0.0005
-        sl += 0.00025
+    for tp_i in range(10, 250, 5):      # 0.001 → 0.025
+        tp = tp_i / 10000
+
+        for sl_i in range(50, 1500, 50):  # 0.005 → 0.15
+            sl = sl_i / 10000
+
+            main(tp_rate=tp, sl_rate=sl)

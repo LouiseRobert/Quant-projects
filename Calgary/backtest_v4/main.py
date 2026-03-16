@@ -1,10 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt 
 from Backtester import Backtester
-from maths import bollinger_bands, rsi, monte_carlo_simulation
+from maths import bollinger_bands, rsi, monte_carlo_simulation, compute_atr
 import numpy as np
 
-DATA_FILE = "../data/XAU_1m_2023.csv"
+DATA_FILE = "../data/XAU_1m_2018.csv"
 
 LOSS_RATE = 0.05
 PROFIT_RATE = 0.0029
@@ -41,6 +41,9 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     df['prev_BB_lower'] = df['BB_lower'].shift(1)
     df['prev_BB_upper'] = df['BB_upper'].shift(1)
 
+    df['ATR'] = compute_atr(df["High"], df["Low"], df["Close"])
+    df["ATR_pct"] = df["ATR"].rank(pct=True)
+
     df = df.dropna()
 
     bt = Backtester(df, profit_rate=tp_rate, loss_rate=sl_rate)
@@ -49,16 +52,24 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
 
     positifs = 0
     negatifs = 0
+
+    avg_duration_positifs = 0
+    avg_duration_negatifs = 0
     for trade in results["all_trades"]:
-        if trade >= 0:
+        if trade["PNL"] >= 0:
             positifs += 1
+            avg_duration_positifs += (trade["duration"]/1000000000) # le timestamp n'est pas en secondes
         else:
             negatifs += 1
+            avg_duration_negatifs += (trade["duration"]/1000000000)
+    
+    avg_duration_positifs = avg_duration_positifs/positifs
+    avg_duration_negatifs = avg_duration_negatifs/negatifs
 
-    wins = [t for t in results["all_trades"] if t > 0]
+    wins = [t["PNL"] for t in results["all_trades"] if t["PNL"] > 0]
     avg_win = sum(wins) / len(wins)
 
-    losses = [t for t in results["all_trades"] if t < 0]
+    losses = [t["PNL"] for t in results["all_trades"] if t["PNL"] < 0]
     avg_loss = sum(losses) / len(losses)  # sera négatif
 
     total_gain = sum(wins)
@@ -70,7 +81,7 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     equity_curve = []
 
     for t in results["all_trades"]:
-        equity += t
+        equity += t["PNL"]
         equity_curve.append(equity)
 
     peak = 100
@@ -84,6 +95,7 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
             max_dd = dd
 
     max_dd_percent = max_dd * 100
+
 
     # ================================
     #     AFFICHAGE DES RESULTATS
@@ -101,10 +113,12 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     print(f"Profit factor               : {profit_factor:.2f}")
     print(f"Max drawdown                : {max_dd_percent:.2f} %")
     print(f"Espérance                   : {(((positifs/results['number_of_trades'])) * avg_win) + ((1-((positifs/results['number_of_trades']))) * avg_loss):.2f}")
+    print(f"Durée moyenne des trades gagnants: {avg_duration_positifs:.0f} sec")
+    print(f"Durée moyenne des trades perdants: {avg_duration_negatifs:.0f} sec")
     print(f"Moyenne du nombre de trades : {results['number_of_trades']/260:.2f} trades/jour")
     print("-----------------------------------")
 
-    final_balances, drawdowns = monte_carlo_simulation(results["all_trades_pct"])
+    final_balances, drawdowns = monte_carlo_simulation(results["all_trades"])
 
     plt.figure(figsize=(12, 5))
     plt.plot(bt.balance_history, label="Balance", linewidth=1.5)
@@ -118,13 +132,7 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
 
 if __name__ == "__main__":
     main()
-    # i = 0.002
 
-    # while i <= 0.004:
-    #     print(f"____________________ Profit rate : {i*100:.2f}% ____________________")
-    #     main(i)
-
-    #     i += 0.0001
 
 
     

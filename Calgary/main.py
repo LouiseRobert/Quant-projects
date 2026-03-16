@@ -7,7 +7,7 @@ from maths import compute_initial_avg_gain_loss, calcul_order_size, compute_rsi_
 
 from mailing import alerte
 
-API_FQDN = "demo-api-capital.backend-capital.com"
+API_FQDN = "api-capital.backend-capital.com"
 TICKER = "GOLD"
 CALGARY_ACCOUNT_NAME = "Calgary"
 
@@ -451,8 +451,11 @@ def alternative_main():
             acc_id = acc_info["id"]
             balance_dispo = acc_info["balancedispo"]
 
-            # Si on a pas de position en cours ET qu'il est avant 22h30
-            if not positions and candletime.time() <= datetime.time(22, 30):
+            time_ok = (candletime.time() <= datetime.time(21, 30) or candletime.time() >= datetime.time(23,10))
+            friday_ok = not (candletime.weekday() == 4 and candletime.time() <= datetime.time(21, 00))
+
+            # Si on a pas de position en cours ET qu'il est entre 21h30 et 23h10 ET qu'on est pas vendredi après 21h
+            if not positions and time_ok and friday_ok:
                 # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
 
                 # déclencheurs RSI
@@ -503,12 +506,12 @@ def alternative_main():
 
             # Initialisation pour la prochaine candle
             previous_timestamp = current_candle['snapshotTime']
-            # previous_previous_rsi = previous_rsi
-            # previous_rsi = current_rsi
             previous_close = close
         
         if positions:
             position = positions[0] # 1 trade à la fois
+            creation_time_utc = datetime.datetime.fromisoformat(position['position']['createdDateUTC'])
+            duration_seconds = (datetime.datetime.now(datetime.timezone.utc) - creation_time_utc).total_seconds()
 
             try:
                 # stop loss : 3% de la balance totale au moment ou j'ai ouvert le trade
@@ -526,10 +529,20 @@ def alternative_main():
                 print("IndexError Take profit.")
                 takeprofit = 0.5
                 
+            pnl_actuel = position['position']['upl']
+
+            ## Break-even stop: on bouge le TP ou le stop à break even
+            if duration_seconds >= 300:
+                # si le cours pars dans la mauvaise direction:
+                if pnl_actuel < 0:
+                    takeprofit = 0
+                else:
+                    stoploss = 0
+
             # Si la condition de stop loss est atteinte
-            if position['position']['upl'] <= -stoploss: # en EUR
+            if pnl_actuel <= -stoploss: # en EUR
                 # On ferme la position
-                print(f"STOP LOSS. Perte : {position['position']['upl']}")
+                print(f"STOP LOSS. Perte : {pnl_actuel}")
                 deal_ref = close_position(cst, token, position['position']['dealId'])
                 
                 # réinitialisation des déclencheurs
@@ -542,12 +555,12 @@ def alternative_main():
                     print("Erreur de fermeture de trade stop loss.")
                     alerte("EXCEPTION", "Erreur de fermeture de trade stop loss.")
                 else:
-                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {position['position']['upl']} \n Balance : {acc_info['balancetotale']}")
+                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds}")
             
             # Si la condition de takeprofit est atteinte
-            elif position['position']['upl'] >= takeprofit: # en EUR
+            elif pnl_actuel >= takeprofit: # en EUR
                 # On ferme la position
-                print(f"TAKE PROFIT. Gain : {position['position']['upl']}")
+                print(f"TAKE PROFIT. Gain : {pnl_actuel}")
                 deal_ref = close_position(cst, token, position['position']['dealId'])
                 
                 # réinitialisation des déclencheurs
@@ -560,10 +573,29 @@ def alternative_main():
                     print("Erreur de fermeture de trade take profit.")
                     alerte("EXCEPTION", "Erreur de fermeture de trade take profit.")
                 else:
-                    alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.datetime.now()} \n Gain : {position['position']['upl']} \n Balance : {acc_info['balancetotale']}")
+                    alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.datetime.now()} \n Gain : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds}")
+            
+            # Si le trade dure depuis 10000 secondes (+- 2h30)
+            elif duration_seconds >= 10000:
+                # On ferme la position
+                print(f"TIME STOP. PNL : {pnl_actuel}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                rsi_cross_high = False
+                rsi_cross_low = False
+
+                acc_info = get_account_info(cst, token)
+
+                if deal_ref == None:
+                    print("Erreur de fermeture de trade time stop.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade time stop.")
+                else:
+                    alerte(f"TIME STOP {TICKER}", f"TIME STOP effectué à {datetime.datetime.now()} \n Gain : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds}")
+
             else:
                 # Sinon rien 
-                print(f"Etat du trade: {position['position']['upl']} EUR")
+                print(f"Etat du trade: {pnl_actuel} EUR")
 
         time.sleep(10)
 

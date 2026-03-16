@@ -3,6 +3,10 @@ BALANCE = 100 # Balance totale du compte
 LEVERAGE = 20 # Levier
 SPREAD = 0.4 # dollars
 
+# Coupe les trades après 166 minutes (+- 2h30)
+TIME_STOP = 10000
+BREAKEVEN_STOP = 300
+
 class Backtester: 
     def __init__(self, df, profit_rate, loss_rate, balance=BALANCE, leverage=LEVERAGE): 
         """
@@ -30,7 +34,9 @@ class Backtester:
         self.takeprofit = None # Le Take profit est fixe et calculé à la prise de position 
         self.units = None # quantité d'or contrôlée 
         self.trades = [] # log des trades cloturés
-        self.trades_pct = []
+
+        self.durations = {"open": None,
+                          "close": None}
 
         self.rsi_cross_low = False
         self.rsi_cross_high = False
@@ -40,45 +46,51 @@ class Backtester:
         high = candle["High"]
         low = candle["Low"]
         rsi = candle["RSI"]
-        rsi_1 = candle["RSI-1"]
+        atr_pct = candle["ATR_pct"]
         datetime = candle["horodatage"]
-
+        timestamp = candle["timestamp"]
+    
         # Position en cours ?
         if self.position is None:
             #### Conditions de long
+
             # Si le RSI passe de inférieur à 30 à supérieur à 30 et que le RSI actuel est < au précédent
-            # rsi_long_ok = (rsi_2 < 30) and (rsi_1 > 30) and (rsi > rsi_1)
-            if rsi < 24:
+            if rsi < 24 :
                 self.rsi_cross_low = True
             # Alors on considère qu'on est en position longue
             shouldibuy = self.rsi_cross_low and (rsi > 35)
 
             #### Conditions de short
             # Si le RSI croise la barre des 70 par le dessus 
-            # rsi_short_ok = (rsi_2 > 70) and (rsi_1 < 70) and (rsi < rsi_1)
-            if rsi > 76:
+            if rsi > 76 :
                 self.rsi_cross_high = True
             # Alors on considère qu'on est en position short
-            shouldisell = self.rsi_cross_high and (rsi < 65)
+            shouldisell = self.rsi_cross_high and (rsi < 65) 
 
             if rsi > 50:
                 self.rsi_cross_low = False
             else:
                 self.rsi_cross_high = False
 
+            friday_after_21 = datetime.weekday() == 4 and datetime.hour > 21 
+            
             # === OUVERTURE DE POSITION SHORT ===
-            if shouldisell == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)):
+            if shouldisell == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)) and not friday_after_21:
                 direction = "short"
 
                 exec_price = self.get_execution_price(close, direction, "entry")
                 self.open_position(exec_price, direction)
 
+                self.durations["open"] = timestamp
+
             # === OUVERTURE DE POSITION LONG ===
-            elif shouldibuy == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)):
+            elif shouldibuy == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)) and not friday_after_21:
                 direction = "long"
 
                 exec_price = self.get_execution_price(close, direction, "entry")
                 self.open_position(exec_price, "long")
+
+                self.durations["open"] = timestamp
         # Si oui, on va gérer notre position en cours
         else:
             ### Conditions de vente de la position longue
@@ -96,24 +108,40 @@ class Backtester:
             if self.position == "short":
                 exec_price = self.get_execution_price(high, "long", "exit") # prix d'execution de sortie du short au prix ASK
                 # === STOP LOSS SHORT ===
-                if exec_price >= self.stoploss:
+                if exec_price >= self.stoploss or (timestamp - self.durations["open"])/1000000000 > TIME_STOP:
+                    self.durations["close"] = timestamp
+
                     self.exit_trade("stop loss", "short", exec_price, candle.name)
 
                 # === TAKE PROFIT SHORT ===
                 elif take_profit_short == True:
                     exec_price = self.get_execution_price(low, "long", "exit") # prix d'execution de sortie du short au prix ASK
+                    self.durations["close"] = timestamp
+
                     self.exit_trade("take profit", "short", exec_price, candle.name)
+                
+                # === Modification du TP à Break even ===
+                elif (timestamp - self.durations["open"])/1000000000 > BREAKEVEN_STOP:
+                    self.takeprofit = self.entry_price - SPREAD/2
 
             elif self.position == "long":
                 exec_price = self.get_execution_price(low, "short", "exit") # prix d'execution de sortie du long au prix BID
                 # === STOP LOSS LONG ===
-                if exec_price <= self.stoploss:
+                if exec_price <= self.stoploss or (timestamp - self.durations["open"])/1000000000 > TIME_STOP:
+                    self.durations["close"] = timestamp
+
                     self.exit_trade("stop loss", "long", exec_price, candle.name)
 
                 # === TAKE PROFIT LONG ===
                 elif take_profit_long == True:
+                    self.durations["close"] = timestamp
                     exec_price = self.get_execution_price(high, "short", "exit") # prix d'execution de sortie du long au prix BID
+
                     self.exit_trade("take profit", "long", exec_price, candle.name)
+                
+                # === Modification du TP à Break even ===
+                elif (timestamp - self.durations["open"])/1000000000 > BREAKEVEN_STOP:
+                    self.takeprofit = self.entry_price + SPREAD/2
             else:
                 pass
 
@@ -211,8 +239,15 @@ class Backtester:
         self.balance += pnl # pnl du trade
         pct_pnl = pnl/self.balance
 
-        self.trades.append(pnl)
-        self.trades_pct.append(pct_pnl)
+        try:
+            self.trades.append({"PNL": pnl,
+                                "PNL_pct": pct_pnl,
+                                "duration": (self.durations["close"] - self.durations["open"])})
+        except TypeError as t:
+            self.trades.append({"PNL": pnl,
+                                "PNL_pct": pct_pnl,
+                                "duration": 0})
+        
         
     def reset(self):
         """
@@ -229,6 +264,11 @@ class Backtester:
         self.units = None 
         self.stoploss = None
         self.takeprofit = None
+
+        self.durations = {
+            "open": None,
+            "close": None
+        }
 
     def run(self):
         for _, candle in self.dataframe.iterrows():
@@ -250,8 +290,7 @@ class Backtester:
 
         return {
             "final_balance": self.balance,
-            "total_pnl": sum(self.trades),
+            "total_pnl": sum(trade["PNL"] for trade in self.trades),
             "number_of_trades": len(self.trades),
             "all_trades": self.trades,
-            "all_trades_pct": self.trades_pct
         }

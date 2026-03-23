@@ -452,8 +452,8 @@ def alternative_main():
             balance_dispo = acc_info["balancedispo"]
 
             time_ok = (candletime.time() <= datetime.time(21, 30) or candletime.time() >= datetime.time(23,10))
-            friday_ok = not (candletime.weekday() == 4 and candletime.time() <= datetime.time(21, 00))
-
+            friday_ok = not (candletime.weekday() == 4 and candletime.time() >= datetime.time(21, 00))
+            print(friday_ok)
             # Si on a pas de position en cours ET qu'il est entre 21h30 et 23h10 ET qu'on est pas vendredi après 21h
             if not positions and time_ok and friday_ok:
                 # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
@@ -472,7 +472,7 @@ def alternative_main():
                     rsi_cross_high = False
 
                 # RSI vient de croiser sa borne supérieure ?
-                if rsi_cross_high and (current_rsi < 70):
+                if rsi_cross_high and (current_rsi < 66.5):
                     print("SELL")
                     deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
 
@@ -486,7 +486,7 @@ def alternative_main():
                         print("Erreur d'ouverture de trade.")
                         alerte("EXCEPTION", "Erreur d'ouverture de trade.")
                 # RSI vient de croiser sa borne inférieure ?
-                elif rsi_cross_low and (current_rsi > 30):
+                elif rsi_cross_low and (current_rsi > 33.5):
                     print("BUY")
                     deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
 
@@ -511,7 +511,12 @@ def alternative_main():
         if positions:
             position = positions[0] # 1 trade à la fois
             creation_time_utc = datetime.datetime.fromisoformat(position['position']['createdDateUTC'])
-            duration_seconds = (datetime.datetime.now(datetime.timezone.utc) - creation_time_utc).total_seconds()
+
+            if creation_time_utc.tzinfo is None:
+                creation_time_utc = creation_time_utc.replace(tzinfo=datetime.timezone.utc)
+
+            duration_seconds = (datetime.datetime.now(datetime.timezone.utc) - creation_time_utc
+                                ).total_seconds()
 
             try:
                 # stop loss : 3% de la balance totale au moment ou j'ai ouvert le trade
@@ -531,13 +536,12 @@ def alternative_main():
                 
             pnl_actuel = position['position']['upl']
 
-            ## Break-even stop: on bouge le TP ou le stop à break even
+            ## Break-even stop: on bouge le TP à break even
             if duration_seconds >= 300:
+                alerte("BREAK EVEN", f"Modification du take profit à break even. \nEtat du trade : {pnl_actuel}\nDurée du trade : {duration_seconds:.2f}")
                 # si le cours pars dans la mauvaise direction:
-                if pnl_actuel < 0:
-                    takeprofit = 0
-                else:
-                    stoploss = 0
+                takeprofit = 0
+                
 
             # Si la condition de stop loss est atteinte
             if pnl_actuel <= -stoploss: # en EUR
@@ -555,7 +559,7 @@ def alternative_main():
                     print("Erreur de fermeture de trade stop loss.")
                     alerte("EXCEPTION", "Erreur de fermeture de trade stop loss.")
                 else:
-                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds}")
+                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.datetime.now()} \n Perte : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds:.2f}")
             
             # Si la condition de takeprofit est atteinte
             elif pnl_actuel >= takeprofit: # en EUR
@@ -573,10 +577,10 @@ def alternative_main():
                     print("Erreur de fermeture de trade take profit.")
                     alerte("EXCEPTION", "Erreur de fermeture de trade take profit.")
                 else:
-                    alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.datetime.now()} \n Gain : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds}")
+                    alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.datetime.now()} \n Gain : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds:.2f}")
             
             # Si le trade dure depuis 10000 secondes (+- 2h30)
-            elif duration_seconds >= 10000:
+            elif duration_seconds >= 5000:
                 # On ferme la position
                 print(f"TIME STOP. PNL : {pnl_actuel}")
                 deal_ref = close_position(cst, token, position['position']['dealId'])
@@ -591,7 +595,7 @@ def alternative_main():
                     print("Erreur de fermeture de trade time stop.")
                     alerte("EXCEPTION", "Erreur de fermeture de trade time stop.")
                 else:
-                    alerte(f"TIME STOP {TICKER}", f"TIME STOP effectué à {datetime.datetime.now()} \n Gain : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds}")
+                    alerte(f"TIME STOP {TICKER}", f"TIME STOP effectué à {datetime.datetime.now()} \n Gain : {pnl_actuel} \n Balance : {acc_info['balancetotale']} \n Durée du trade: {duration_seconds:.2f}")
 
             else:
                 # Sinon rien 

@@ -4,7 +4,7 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi, monte_carlo_simulation, compute_atr
 import numpy as np
 
-DATA_FILE = "../data/XAU_1m_2018.csv"
+DATA_FILE = "../data/XAU_1m_2023.csv"
 
 LOSS_RATE = 0.05
 PROFIT_RATE = 0.0029

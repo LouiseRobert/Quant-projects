@@ -185,7 +185,7 @@ class Backtester:
         
     def exit_trade(self, label, direction, price, datetime = ""):
         """
-        Docstring for exit_trade
+        Calcul du PNL du
         
         :param label: Description de la sortie du trade
         :param direction: Sens du trade à stopper

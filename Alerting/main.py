@@ -19,9 +19,9 @@ API_FQDN = "api-capital.backend-capital.com"
 TICKER = "GOLD"
 
 ### PARAMETRES RSI
-RSI_PERIOD = 13
-RSI_HIGH = 72
-RSI_LOW = 28
+RSI_PERIOD = 14
+RSI_HIGH = 73
+RSI_LOW = 27
 
 def get_API_time():
     """
@@ -60,8 +60,6 @@ def get_connection_token():
             "Token": res.getheader("X-SECURITY-TOKEN")}
 
     return auth
-    # print(f"Security token : {res.getheader("X-SECURITY-TOKEN")}")
-    # print(data.decode("utf-8"))
 
 def get_last_candles(cst, token, candle_number = 1):
     """
@@ -78,7 +76,7 @@ def get_last_candles(cst, token, candle_number = 1):
         'X-SECURITY-TOKEN': token,
         'CST': cst
         }
-        conn.request("GET", f"/api/v1/prices/{TICKER}?resolution=MINUTE&max={candle_number}", payload, headers)
+        conn.request("GET", f"/api/v1/prices/{TICKER}?resolution=MINUTE_5&max={candle_number}", payload, headers)
         res = conn.getresponse()
         data = res.read()
 

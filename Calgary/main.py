@@ -7,7 +7,7 @@ from maths import compute_initial_avg_gain_loss, calcul_order_size, compute_rsi_
 
 from mailing import alerte
 
-API_FQDN = "api-capital.backend-capital.com"
+API_FQDN = "demo-api-capital.backend-capital.com"
 TICKER = "GOLD"
 CALGARY_ACCOUNT_NAME = "Calgary"
 
@@ -471,8 +471,9 @@ def alternative_main():
                 else:
                     rsi_cross_high = False
 
+
                 # RSI vient de croiser sa borne supérieure ?
-                if rsi_cross_high and (current_rsi < 66.5):
+                if rsi_cross_high and (current_rsi < 65):
                     print("SELL")
                     deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
 
@@ -486,7 +487,7 @@ def alternative_main():
                         print("Erreur d'ouverture de trade.")
                         alerte("EXCEPTION", "Erreur d'ouverture de trade.")
                 # RSI vient de croiser sa borne inférieure ?
-                elif rsi_cross_low and (current_rsi > 33.5):
+                elif rsi_cross_low and (current_rsi > 35):
                     print("BUY")
                     deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
 

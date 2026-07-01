@@ -253,16 +253,20 @@ if __name__ == "__main__":
         # Détection de franchissement
         # Si le RSI vient de franchir la limite haute
         if previous_rsi < RSI_HIGH and current_rsi >= RSI_HIGH:
-            alerte(objet = f"RSI crossed ABOVE {RSI_HIGH}", message= "Il faut effctuer un SELL.")
+            alerte(objet = f"RSI crossed ABOVE {RSI_HIGH}", message= "Préparation SELL.")
+
+        if previous_rsi > RSI_HIGH and current_rsi <= RSI_HIGH:
+            alerte(objet = f"RSI crossed BELOW {RSI_HIGH}", message= "Il faut effectuer un SELL.")
 
         # Si le RSI vient de franchir la limite basse
         if previous_rsi > RSI_LOW and current_rsi <= RSI_LOW:
-            alerte(objet = f"RSI crossed BELOW {RSI_LOW}", message= "Il faut effctuer un BUY.")
+            alerte(objet = f"RSI crossed BELOW {RSI_LOW}", message= "Préparation BUY.")
+
+        if previous_rsi < RSI_LOW and current_rsi >= RSI_LOW:
+            alerte(objet = f"RSI crossed ABOVE {RSI_LOW}", message= "Il faut effectuer un BUY.")
 
         # Initialisation pour la prochaine candle
         previous_timestamp = candle['snapshotTime']
         previous_rsi = current_rsi
         previous_close = close
-
-    # print(wait_for_next_closed_candle(cst, token, "2026-02-04T19:30:00"))
 

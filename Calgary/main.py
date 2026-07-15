@@ -1,5 +1,6 @@
 import http.client
 import json
+import time as time_module
 from datetime import time, datetime, timedelta
 from creds import login, password, apikey
 
@@ -186,7 +187,7 @@ def wait_for_next_closed_candle(cst, token, last_candle_time):
         if candle is not None and candle[-2]['snapshotTime'] != last_candle_time :
             return candle[-2]
 
-        time.sleep(5)
+        time_module.sleep(5)
 
 def get_last_candles(cst, token, candle_number = 1):
     """
@@ -393,7 +394,7 @@ def main_nightbot():
 
     while candles is None:
         print("Erreur dans la récupération des candles, attente de 5 secondes...")
-        time.sleep(5)
+        time_module.sleep(5)
         candles = get_last_candles(cst, token, candle_number=RSI_PERIOD + 1)
 
     # On extrait les prix de cloture des candles récupérées
@@ -557,7 +558,7 @@ def main_nightbot():
             seconds_to_sleep = (next_midnight - now).total_seconds()
 
             print("Le night bot Calgary s'endort jusqu'à minuit...")
-            time.sleep(seconds_to_sleep)
+            time_module.sleep(seconds_to_sleep)
 
 if __name__ == "__main__":
     main_nightbot()

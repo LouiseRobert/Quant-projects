@@ -219,6 +219,7 @@ def get_last_candles(cst, token, candle_number = 1):
 
     except Exception as e:
         print(f"ERREUR: Récupération de la dernière candle : {e}")
+        print(e.__traceback__)
 
     return candles
 
@@ -419,6 +420,11 @@ def main_nightbot():
 
         if 0 <= now.hour < 9:
             # Entre minuit et 9h
+
+            # On rafraichit la connexion à l'API
+            auth = get_connection_token()
+            cst = auth['CST']
+            token = auth["Token"]
 
             ### process de la candle courante ###
             # Quand on passe à une nouvelle candle

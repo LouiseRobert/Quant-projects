@@ -82,5 +82,4 @@ def extract_close_prices(candles):
         avg_close = ( candle['closePrice']['bid'] + candle['closePrice']['ask'] )/ 2
         closes.append(avg_close)
     
-    # On inverse la liste pour faire passer la candle la plus récente à la fin
-    return closes[::-1]
+    return closes

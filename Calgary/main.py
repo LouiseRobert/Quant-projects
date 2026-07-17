@@ -369,11 +369,9 @@ def fetch_current_positions(cst, token):
 
     return positions
 
-def main_nightbot():
-    """
-    Le bot va attendre les horaires de nuit pour travailler. 
-    """
-
+def night_session():
+    """ Travail du robot lancé la nuit """
+    #### Initialisation ####
     auth = get_connection_token()
     cst = auth['CST']
     token = auth["Token"]
@@ -385,7 +383,7 @@ def main_nightbot():
     acc_info = get_account_info(cst, token)
     acc_id = acc_info["id"]
 
-    current_acc = switch_active_account(cst, token, acc_id)
+    #current_acc = switch_active_account(cst, token, acc_id)
 
     leverage = get_account_leverage(cst, token)
 
@@ -412,150 +410,160 @@ def main_nightbot():
     rsi_cross_low = False
     rsi_cross_high = False
 
-    now = datetime.now()
+    previous_rsi = None
 
-    print(f"Début du process : {now}")
-    while True:
+    while 0 <= datetime.now().hour < 9:
         now = datetime.now()
 
+        ### process de la candle courante ###
+        # Quand on passe à une nouvelle candle
+        candle = wait_for_next_closed_candle(cst, token, previous_timestamp)
+        print(candle)
+        # On récupère son prix moyen de cloture et on le compare au précédent
+        close = (candle['closePrice']['bid'] + candle['closePrice']['ask']) /2
+        delta = close - previous_close
+
+        gain = max(delta, 0)
+        loss = max(-delta, 0)
+
+        # Calcul du RSI courant
+        avg_gain = (avg_gain * (RSI_PERIOD - 1) + gain) / RSI_PERIOD
+        avg_loss = (avg_loss * (RSI_PERIOD - 1) + loss) / RSI_PERIOD
+
+        current_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
+        print(f"{now} : RSI courant: {current_rsi}")
+
+        # Si on est à la première itération de boucle
+        if previous_rsi is None:
+            previous_rsi = current_rsi
+
+        # Informations sur le compte
+        acc_info = get_account_info(cst, token)
+        #acc_id = acc_info["id"]
+        balance_dispo = acc_info["balancedispo"]
+
+        # Sommes nous en position ?
+        positions = fetch_current_positions(cst, token)
+        if positions == []:
+            # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
+
+            # déclencheurs RSI
+            if current_rsi < RSI_LOW:
+                rsi_cross_low = True
+
+            if current_rsi > RSI_HIGH:
+                rsi_cross_high = True
+
+            # reinitialisation si fausse alerte
+            if current_rsi > 50:
+                rsi_cross_low = False
+            else:
+                rsi_cross_high = False
+
+            # RSI vient de croiser sa borne supérieure et rerentrer dans la norme RSI ?
+            if rsi_cross_high and (current_rsi < 60):
+                print("SELL")
+                deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
+
+                if deal_id is not None:
+                    trade_history.append({"deal_id": deal_id,
+                                        "risk_amount": acc_info['balancetotale'] * QTE_LOSS,
+                                        "profit_goal": acc_info['balancetotale'] * QTE_TP
+                                        })  
+                    rsi_cross_high = False                    
+                    alerte(f"SELL {TICKER}", f"SELL effectué à {datetime.now()}")
+                else: 
+                    print("Erreur d'ouverture de trade.")
+                    alerte("EXCEPTION", "Erreur d'ouverture de trade.")
+
+            # RSI vient de croiser sa borne inférieure et rerentrer dans la norme RSI ?
+            elif rsi_cross_low and (current_rsi > 40):
+                print("BUY")
+                deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
+
+                if deal_id is not None:
+                    trade_history.append({"deal_id": deal_id,
+                                        "risk_amount": acc_info['balancetotale'] * QTE_LOSS,
+                                        "profit_goal": acc_info['balancetotale'] * QTE_TP
+                                        })
+                    rsi_cross_low = False
+                    alerte(f"BUY {TICKER}", f"BUY effectué à {datetime.now()}")
+                else: 
+                    print("Erreur d'ouverture de trade.")
+                    alerte("EXCEPTION", "Erreur d'ouverture de trade.")
+            else:
+                print(f"Pas de trade en cours. RSI : {current_rsi}")
+        else:
+            position = positions[0] # 1 trade à la fois
+
+            try:
+                # stop loss : 5% de la balance totale au moment ou j'ai ouvert le trade
+                stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
+            except IndexError as e:
+                # Il y a eu un problème, on va utiliser une solution pas top mais on continue
+                print("IndexError.")
+                stoploss = acc_info['balancetotale'] * QTE_LOSS
+                
+            try:
+                # take profit: 0.5% de la balance totale au moment ou j'ai ouvert le trade
+                takeprofit = trade_history[-1]['profit_goal']
+            except IndexError as e:
+                # Il y a eu un problème, on va utiliser une solution pas top mais on continue
+                print("IndexError.")
+                takeprofit = acc_info['balancetotale'] * QTE_TP
+
+            # Si la condition de stop loss est atteinte
+            if position['position']['upl'] <= -stoploss: # en EUR
+                # On ferme la position
+                print(f"STOP LOSS. Perte : {position['position']['upl']}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                rsi_cross_high = False
+                rsi_cross_low = False
+
+                if deal_ref is None:
+                    print("Erreur de fermeture de trade.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade.")
+                else:
+                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.now()} \n Perte : {position['position']['upl']}")
+
+            # Si on atteint le TP ou qu'on passe la barre des RSI 50 on ferme en TP
+            elif (position['position']['upl'] > takeprofit) or ((previous_rsi < 50 <= current_rsi) or (previous_rsi > 50 >= current_rsi)): # en EUR
+                # On ferme la position
+                print(f"TAKE PROFIT. Gain : {position['position']['upl']}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                rsi_cross_high = False
+                rsi_cross_low = False
+
+                if deal_ref is None:
+                    print("Erreur de fermeture de trade.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade.")
+                else:
+                    alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.now()} \n Gain : {position['position']['upl']}")
+            else:
+                # Sinon rien 
+                print(f"Etat du trade: {position['position']['upl']} EUR")
+
+        # Initialisation pour la prochaine candle
+        previous_timestamp = candle['snapshotTime']
+        previous_close = close
+        previous_rsi = current_rsi
+
+    return
+
+def main_nightbot():
+    """
+    Le bot va attendre les horaires de nuit pour travailler. 
+    """
+    print(f"Début du process : {datetime.now()}")
+    while True:
+        now = datetime.now()
         if 0 <= now.hour < 9:
             # Entre minuit et 9h
-
-            # On rafraichit la connexion à l'API
-            auth = get_connection_token()
-            cst = auth['CST']
-            token = auth["Token"]
-
-            ### process de la candle courante ###
-            # Quand on passe à une nouvelle candle
-            candle = wait_for_next_closed_candle(cst, token, previous_timestamp)
-            print(candle)
-            # On récupère son prix moyen de cloture et on le compare au précédent
-            close = (candle['closePrice']['bid'] + candle['closePrice']['ask']) /2
-            delta = close - previous_close
-
-            gain = max(delta, 0)
-            loss = max(-delta, 0)
-
-            # Calcul du RSI courant
-            avg_gain = (avg_gain * (RSI_PERIOD - 1) + gain) / RSI_PERIOD
-            avg_loss = (avg_loss * (RSI_PERIOD - 1) + loss) / RSI_PERIOD
-
-            current_rsi = compute_rsi_from_avg(avg_gain, avg_loss)
-            print(f"{now} : RSI courant: {current_rsi}")
-
-            # Informations sur le compte
-            acc_info = get_account_info(cst, token)
-            acc_id = acc_info["id"]
-            balance_dispo = acc_info["balancedispo"]
-
-            # Sommes nous en position ?
-            positions = fetch_current_positions(cst, token)
-
-            if positions == []:
-                # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
-
-                # déclencheurs RSI
-                if current_rsi < RSI_LOW:
-                    rsi_cross_low = True
-
-                if current_rsi > RSI_HIGH:
-                    rsi_cross_high = True
-
-                # reinitialisation si fausse alerte
-                if current_rsi > 50:
-                    rsi_cross_low = False
-                else:
-                    rsi_cross_high = False
-
-                # RSI vient de croiser sa borne supérieure et rerentrer dans la norme RSI ?
-                if rsi_cross_high and (current_rsi < 60):
-                    print("SELL")
-                    deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
-
-                    if deal_id is not None:
-                        trade_history.append({"deal_id": deal_id,
-                                            "risk_amount": acc_info['balancetotale'] * QTE_LOSS,
-                                            "profit_goal": acc_info['balancetotale'] * QTE_TP
-                                            })  
-                        rsi_cross_high = False                    
-                        alerte(f"SELL {TICKER}", f"SELL effectué à {datetime.now()}")
-                    else: 
-                        print("Erreur d'ouverture de trade.")
-                        alerte("EXCEPTION", "Erreur d'ouverture de trade.")
-
-                # RSI vient de croiser sa borne inférieure et rerentrer dans la norme RSI ?
-                elif rsi_cross_low and (current_rsi > 40):
-                    print("BUY")
-                    deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
-
-                    if deal_id is not None:
-                        trade_history.append({"deal_id": deal_id,
-                                            "risk_amount": acc_info['balancetotale'] * QTE_LOSS,
-                                            "profit_goal": acc_info['balancetotale'] * QTE_TP
-                                            })
-                        rsi_cross_low = False
-                        alerte(f"BUY {TICKER}", f"BUY effectué à {datetime.now()}")
-                    else: 
-                        print("Erreur d'ouverture de trade.")
-                        alerte("EXCEPTION", "Erreur d'ouverture de trade.")
-                else:
-                    print(f"Pas de trade en cours. RSI : {current_rsi}")
-            else:
-                position = positions[0] # 1 trade à la fois
-
-                try:
-                    # stop loss : 5% de la balance totale au moment ou j'ai ouvert le trade
-                    stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
-                except IndexError as e:
-                    # Il y a eu un problème, on va utiliser une solution pas top mais on continue
-                    print("IndexError.")
-                    stoploss = acc_info['balancetotale'] * QTE_LOSS
-                    
-                try:
-                    # take profit: 0.5% de la balance totale au moment ou j'ai ouvert le trade
-                    takeprofit = trade_history[-1]['profit_goal']
-                except IndexError as e:
-                    # Il y a eu un problème, on va utiliser une solution pas top mais on continue
-                    print("IndexError.")
-                    takeprofit = acc_info['balancetotale'] * QTE_TP
-
-                # Si la condition de stop loss est atteinte
-                if position['position']['upl'] <= -stoploss: # en EUR
-                    # On ferme la position
-                    print(f"STOP LOSS. Perte : {position['position']['upl']}")
-                    deal_ref = close_position(cst, token, position['position']['dealId'])
-                    
-                    # réinitialisation des déclencheurs
-                    rsi_cross_high = False
-                    rsi_cross_low = False
-
-                    if deal_ref is None:
-                        print("Erreur de fermeture de trade.")
-                        alerte("EXCEPTION", "Erreur de fermeture de trade.")
-                    else:
-                        alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.now()} \n Perte : {position['position']['upl']}")
-                elif position['position']['upl'] > takeprofit: # en EUR
-                    # On ferme la position
-                    print(f"TAKE PROFIT. Gain : {position['position']['upl']}")
-                    deal_ref = close_position(cst, token, position['position']['dealId'])
-                    
-                    # réinitialisation des déclencheurs
-                    rsi_cross_high = False
-                    rsi_cross_low = False
-
-                    if deal_ref is None:
-                        print("Erreur de fermeture de trade.")
-                        alerte("EXCEPTION", "Erreur de fermeture de trade.")
-                    else:
-                        alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.now()} \n Gain : {position['position']['upl']}")
-                else:
-                    # Sinon rien 
-                    print(f"Etat du trade: {position['position']['upl']} EUR")
-
-            # Initialisation pour la prochaine candle
-            previous_timestamp = candle['snapshotTime']
-            previous_close = close
+            night_session()
         else:
             # Prochain minuit
             next_midnight = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())

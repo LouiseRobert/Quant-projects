@@ -81,7 +81,7 @@ def calgary():
 
         #  ------------ Somme nous la nuit ? ------------ #
         ### l'heure est bonne si on est entre minuit et 9h
-        nighttime = time_module.time(0, 0) <= now.time() < time_module.time(9, 0)
+        nighttime = datetime.time(0, 0) <= now.time() < datetime.time(9, 0)
 
         #  ------------ Sommes nous en position ? ------------ #
         positions = fetch_current_positions(cst, token)

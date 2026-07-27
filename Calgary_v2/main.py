@@ -1,6 +1,6 @@
 import time as time_module
-from datetime import time, datetime, timedelta
-
+from datetime import datetime, time
+ 
 from config import *
 from maths import *
 from mails import *
@@ -81,7 +81,7 @@ def calgary():
 
         #  ------------ Somme nous la nuit ? ------------ #
         ### l'heure est bonne si on est entre minuit et 9h
-        nighttime = datetime.time(0, 0) <= now.time() < datetime.time(9, 0)
+        nighttime = time(0, 0) <= now.time() < time(9, 0)
 
         #  ------------ Sommes nous en position ? ------------ #
         positions = fetch_current_positions(cst, token)

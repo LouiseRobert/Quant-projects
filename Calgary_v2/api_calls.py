@@ -1,6 +1,6 @@
 import http.client
 import json
-import time
+import time as time_module
 from config import *
 from maths import *
 
@@ -90,7 +90,7 @@ def wait_for_next_closed_candle(cst, token, last_candle_time):
         # si les candles ont pu être récupérées, on renvoie la première (la dernière candle cloturée)
         if candle is not None and candle[-2]['snapshotTime'] != last_candle_time :
             return candle[-2]
-        time.sleep(5)
+        time_module.sleep(5)
 
 def get_account_leverage(cst, token):
     """

@@ -47,6 +47,8 @@ def calgary():
 
     should_sell = False
     should_buy = False
+    rsi_crossed_low = False
+    rsi_crossed_high = False
 
     previous_rsi = None
 
@@ -88,14 +90,13 @@ def calgary():
         if positions == []:
             # Pas de position courante, on regarde si on a un signal pour acheter ou vendre
 
-            # Détection de franchissement
+            #  ------------ Détéction de franchissement - Alerting ------------ #
             # Si le RSI vient de franchir la limite haute
             if previous_rsi < RSI_HIGH and current_rsi >= RSI_HIGH:
                 alerte(objet = f"RSI crossed ABOVE {RSI_HIGH}", message= "Préparation SELL.")
 
             if previous_rsi > RSI_HIGH and current_rsi <= RSI_HIGH:
                 alerte(objet = f"RSI crossed BELOW {RSI_HIGH}", message= "Il faut effectuer un SELL.")
-                should_sell = True and nighttime
 
             # Si le RSI vient de franchir la limite basse
             if previous_rsi > RSI_LOW and current_rsi <= RSI_LOW:
@@ -103,8 +104,28 @@ def calgary():
 
             if previous_rsi < RSI_LOW and current_rsi >= RSI_LOW:
                 alerte(objet = f"RSI crossed ABOVE {RSI_LOW}", message= "Il faut effectuer un BUY.")
+
+
+            #  ------------ Détéction de franchissement - Nighttime bot ------------ #
+            # déclencheurs RSI
+            if nighttime and (current_rsi < RSI_LOW):
+                rsi_crossed_low = True
+
+            if nighttime and (current_rsi > RSI_HIGH):
+                rsi_crossed_high = True
+
+            # reinitialisation si fausse alerte
+            if current_rsi > 50:
+                rsi_crossed_low = False
+            else:
+                rsi_crossed_high = False
+
+            if rsi_crossed_low and (current_rsi > 40):
                 should_buy = True and nighttime
 
+            if rsi_crossed_high and (current_rsi < 60):
+                should_sell = True and nighttime
+            
             # RSI vient de croiser sa borne supérieure et rerentrer dans la norme RSI ?
             if should_sell:
                 print("SELL")
@@ -115,12 +136,13 @@ def calgary():
                                         "risk_amount": acc_info['balancetotale'] * QTE_LOSS,
                                         "profit_goal": acc_info['balancetotale'] * QTE_TP
                                         })  
-                    alerte(f"SELL {TICKER}", f"SELL effectué à {datetime.now()}")
+                    alerte(f"SELL {TICKER}", f"SELL effectué à {datetime.now()} \nRSI : {current_rsi}")
                 else: 
                     print("Erreur d'ouverture de trade.")
                     alerte("EXCEPTION", "Erreur d'ouverture de trade.")
 
                 should_sell = False 
+                rsi_crossed_high = False
 
             # RSI vient de croiser sa borne inférieure et rerentrer dans la norme RSI ?
             elif should_buy:
@@ -138,6 +160,7 @@ def calgary():
                     alerte("EXCEPTION", "Erreur d'ouverture de trade.")
                 
                 should_buy = False
+                rsi_crossed_low = False
 
             else:
                 print(f"Pas de trade en cours. RSI : {current_rsi}")
@@ -170,6 +193,8 @@ def calgary():
                     # réinitialisation des déclencheurs
                     should_buy = False
                     should_sell = False
+                    rsi_crossed_low = False
+                    rsi_crossed_high = False
 
                     if deal_ref is None:
                         print("Erreur de fermeture de trade.")
@@ -186,6 +211,8 @@ def calgary():
                     # réinitialisation des déclencheurs
                     should_buy = False
                     should_sell = False
+                    rsi_crossed_low = False
+                    rsi_crossed_high = False
 
                     if deal_ref is None:
                         print("Erreur de fermeture de trade.")

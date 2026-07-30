@@ -57,7 +57,7 @@ def get_last_candles(cst, token, candle_number = 1):
         'X-SECURITY-TOKEN': token,
         'CST': cst
         }
-        conn.request("GET", f"/api/v1/prices/{TICKER}?resolution=MINUTE_5&max={candle_number}", payload, headers)
+        conn.request("GET", f"/api/v1/prices/{TICKER}?resolution={CANDLE_SIZE}&max={candle_number}", payload, headers)
         res = conn.getresponse()
         data = res.read()
 

@@ -95,7 +95,7 @@ def calgary():
 
             if previous_rsi > RSI_HIGH and current_rsi <= RSI_HIGH:
                 alerte(objet = f"RSI crossed BELOW {RSI_HIGH}", message= "Il faut effectuer un SELL.")
-                should_sell = True
+                should_sell = True and nighttime
 
             # Si le RSI vient de franchir la limite basse
             if previous_rsi > RSI_LOW and current_rsi <= RSI_LOW:
@@ -103,10 +103,10 @@ def calgary():
 
             if previous_rsi < RSI_LOW and current_rsi >= RSI_LOW:
                 alerte(objet = f"RSI crossed ABOVE {RSI_LOW}", message= "Il faut effectuer un BUY.")
-                should_buy = True
+                should_buy = True and nighttime
 
             # RSI vient de croiser sa borne supérieure et rerentrer dans la norme RSI ?
-            if should_sell and nighttime:
+            if should_sell:
                 print("SELL")
                 deal_id = create_position(cst, token, "SELL", balance_dispo, leverage)
 
@@ -123,7 +123,7 @@ def calgary():
                 should_sell = False 
 
             # RSI vient de croiser sa borne inférieure et rerentrer dans la norme RSI ?
-            elif should_buy and nighttime:
+            elif should_buy:
                 print("BUY")
                 deal_id = create_position(cst, token, "BUY", balance_dispo, leverage)      
 

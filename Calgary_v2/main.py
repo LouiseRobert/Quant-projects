@@ -120,10 +120,10 @@ def calgary():
             else:
                 rsi_crossed_high = False
 
-            if rsi_crossed_low and (current_rsi > 40):
+            if rsi_crossed_low and (current_rsi > 43):
                 should_buy = True and nighttime
 
-            if rsi_crossed_high and (current_rsi < 60):
+            if rsi_crossed_high and (current_rsi < 57):
                 should_sell = True and nighttime
             
             # RSI vient de croiser sa borne supérieure et rerentrer dans la norme RSI ?

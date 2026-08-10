@@ -283,7 +283,7 @@ def create_position(cst, token, direction, available_balance, leverage):
     "size": size, # genre 0.3 
     "guaranteedStop": True, # True pour moi car pas le choix
     "stopAmount": round(available_balance*0.47), # Quantité à perdre si SL 
-    "profitAmount": round(available_balance*QTE_TP)
+    "profitAmount": math.floor(available_balance*QTE_TP*100)/100
     })
     headers = {
     'X-SECURITY-TOKEN': token,

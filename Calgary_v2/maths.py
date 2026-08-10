@@ -1,3 +1,5 @@
+import math
+
 def compute_initial_avg_gain_loss(closes, period=13):
     """
     Calcule l'average gain et loss initial pour le RSI (méthode de Wilder)

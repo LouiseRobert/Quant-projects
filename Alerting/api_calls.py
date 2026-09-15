@@ -1,3 +1,8 @@
+import http.client
+import json
+import time
+from config import *
+
 def get_API_time():
     """
     Pour vérifier qu'on contacte bien l'API

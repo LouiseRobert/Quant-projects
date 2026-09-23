@@ -4,7 +4,7 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi, monte_carlo_simulation, compute_atr
 import numpy as np
 
-DATA_FILE = "./data/XAU_5m_2026.csv"
+DATA_FILE = "./data/XAU_5m_2025.csv"
 
 LOSS_RATE = 0.045
 PROFIT_RATE = 0.01
@@ -34,15 +34,6 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
 
     # Ajout de la colonne contenant le RSI précédent
     df['RSI-1'] = df['RSI'].shift(1)
-    # df['RSI-2'] = df['RSI'].shift(2)
-
-    # df["MoyMob"], df["BB_upper"], df['BB_lower'] = bollinger_bands(df["Close"], 21)
-    
-    # df['prev_BB_lower'] = df['BB_lower'].shift(1)
-    # df['prev_BB_upper'] = df['BB_upper'].shift(1)
-
-    # df['ATR'] = compute_atr(df["High"], df["Low"], df["Close"])
-    # df["ATR_pct"] = df["ATR"].rank(pct=True)
 
     df = df.dropna()
 

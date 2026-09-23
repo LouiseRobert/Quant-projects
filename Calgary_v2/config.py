@@ -19,5 +19,5 @@ RSI_LOW = 27
 QTE_LOSS = 0.05 # 5% de perte
 QTE_TP = 0.005 # 0.5% de gain si TP
 
-CANDLE_SIZE = "MINUTE_5"
+CANDLE_SIZE = "MINUTE" #"MINUTE_5"
 

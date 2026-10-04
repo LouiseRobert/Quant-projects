@@ -8,7 +8,7 @@ from api_calls import *
 
 
 def calgary():
-    """ Travail du robot lancé la nuit """
+    """ Travail du robot """
     # ------------ Initialisation Compte ------------ #
     auth = get_connection_token()
     cst = auth['CST']
@@ -49,6 +49,8 @@ def calgary():
     should_buy = False
     rsi_crossed_low = False
     rsi_crossed_high = False
+    buy_signal = False
+    sell_signal = False
 
     previous_rsi = None
 
@@ -60,6 +62,15 @@ def calgary():
         # On récupère son prix moyen de cloture et on le compare au précédent
         close = (candle['closePrice']['bid'] + candle['closePrice']['ask']) /2
         delta = close - previous_close
+
+        open = (candle['openPrice']['bid'] + candle['openPrice']['ask']) /2
+
+        # Calcul de la couleur de la candle:
+        candle_color = "green" # vert par défaut
+        if close >= open:
+            candle_color = "green"
+        else:
+            candle_color = "red"
 
         gain = max(delta, 0)
         loss = max(-delta, 0)
@@ -82,8 +93,8 @@ def calgary():
         balance_dispo = acc_info["balancedispo"]
 
         #  ------------ Somme nous la nuit ? ------------ #
-        ### l'heure est bonne si on est entre minuit et 9h
-        nighttime = time(0, 0) <= now.time() < time(9, 0)
+        ### l'heure est bonne si il est 9h passé
+        daytime = now.time() >= time(9, 0)
 
         #  ------------ Sommes nous en position ? ------------ #
         positions = fetch_current_positions(cst, token)
@@ -106,25 +117,31 @@ def calgary():
                 alerte(objet = f"RSI crossed ABOVE {RSI_LOW}", message= "Il faut effectuer un BUY.")
 
 
-            #  ------------ Détéction de franchissement - Nighttime bot ------------ #
+            #  ------------ Détéction de franchissement - daytime bot ------------ #
             # déclencheurs RSI
-            if nighttime and (current_rsi < RSI_LOW):
+            if daytime and (current_rsi < RSI_LOW):
                 rsi_crossed_low = True
+                rsi_crossed_high = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
-            if nighttime and (current_rsi > RSI_HIGH):
+            if daytime and (current_rsi > RSI_HIGH):
                 rsi_crossed_high = True
+                rsi_crossed_low = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
-            # reinitialisation si fausse alerte
-            if current_rsi > 50:
-                rsi_crossed_low = False
-            else:
-                rsi_crossed_high = False
-
+            # quand le RSI signale un retournement, on surveille le signal
             if rsi_crossed_low and (current_rsi > 42):
-                should_buy = True and nighttime
+                buy_signal = True
+                sell_signal = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
             if rsi_crossed_high and (current_rsi < 58):
-                should_sell = True and nighttime
+                sell_signal = True
+                buy_signal = False # réinitialisation dans le cas ou le prix se serait trop retourné
+
+            # on entre en position après une candle inverse                
+            if buy_signal and candle_color == "red":
+                should_buy = True and daytime
+
+            if sell_signal and candle_color == "green":
+                should_sell = True and daytime
             
             # RSI vient de croiser sa borne supérieure et rerentrer dans la norme RSI ?
             if should_sell:
@@ -143,6 +160,7 @@ def calgary():
 
                 should_sell = False 
                 rsi_crossed_high = False
+                sell_signal = False
 
             # RSI vient de croiser sa borne inférieure et rerentrer dans la norme RSI ?
             elif should_buy:
@@ -161,12 +179,13 @@ def calgary():
                 
                 should_buy = False
                 rsi_crossed_low = False
+                buy_signal = False
 
             else:
                 print(f"Pas de trade en cours. RSI : {current_rsi}")
         else:
-            # On ne manage les position que la nuit
-            if nighttime:
+            # On ne manage les position que la journée
+            if daytime:
                 position = positions[0] # 1 trade à la fois
                 try:
                     # stop loss : 5% de la balance totale au moment ou j'ai ouvert le trade
@@ -195,6 +214,8 @@ def calgary():
                     should_sell = False
                     rsi_crossed_low = False
                     rsi_crossed_high = False
+                    buy_signal = False
+                    sell_signal = False
 
                     if deal_ref is None:
                         print("Erreur de fermeture de trade.")
@@ -202,8 +223,8 @@ def calgary():
                     else:
                         alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.now()} \n Perte : {position['position']['upl']}")
 
-                # Si on atteint le TP ou qu'on passe la barre des RSI 50 on ferme en TP
-                elif (position['position']['upl'] > takeprofit) or ((previous_rsi < 50 <= current_rsi) or (previous_rsi > 50 >= current_rsi)): # en EUR
+                # Si on atteint le TP 
+                elif (position['position']['upl'] > takeprofit): # en EUR
                     # On ferme la position
                     print(f"TAKE PROFIT. Gain : {position['position']['upl']}")
                     deal_ref = close_position(cst, token, position['position']['dealId'])
@@ -213,6 +234,8 @@ def calgary():
                     should_sell = False
                     rsi_crossed_low = False
                     rsi_crossed_high = False
+                    buy_signal = False
+                    sell_signal = False
 
                     if deal_ref is None:
                         print("Erreur de fermeture de trade.")

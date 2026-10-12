@@ -185,69 +185,66 @@ def calgary():
                 print(f"Pas de trade en cours. RSI : {current_rsi}")
         else:
             # On ne manage les position que la journée
-            if daytime:
-                position = positions[0] # 1 trade à la fois
-                try:
-                    # stop loss : 5% de la balance totale au moment ou j'ai ouvert le trade
-                    stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
-                except IndexError as e:
-                    # Il y a eu un problème, on va utiliser une solution pas top mais on continue
-                    print("IndexError.")
-                    stoploss = acc_info['balancetotale'] * QTE_LOSS
-                    
-                try:
-                    # take profit: 0.5% de la balance totale au moment ou j'ai ouvert le trade
-                    takeprofit = trade_history[-1]['profit_goal']
-                except IndexError as e:
-                    # Il y a eu un problème, on va utiliser une solution pas top mais on continue
-                    print("IndexError.")
-                    takeprofit = acc_info['balancetotale'] * QTE_TP
 
-                # Si la condition de stop loss est atteinte
-                if position['position']['upl'] <= -stoploss: # en EUR
-                    # On ferme la position
-                    print(f"STOP LOSS. Perte : {position['position']['upl']}")
-                    deal_ref = close_position(cst, token, position['position']['dealId'])
-                    
-                    # réinitialisation des déclencheurs
-                    should_buy = False
-                    should_sell = False
-                    rsi_crossed_low = False
-                    rsi_crossed_high = False
-                    buy_signal = False
-                    sell_signal = False
+            position = positions[0] # 1 trade à la fois
+            try:
+                # stop loss : 5% de la balance totale au moment ou j'ai ouvert le trade
+                stoploss = trade_history[-1]['risk_amount'] # Cette mécanique m'empeche donc de trader à la main sur ce compte
+            except IndexError as e:
+                # Il y a eu un problème, on va utiliser une solution pas top mais on continue
+                print("IndexError.")
+                stoploss = acc_info['balancetotale'] * QTE_LOSS
+                
+            try:
+                # take profit: 0.5% de la balance totale au moment ou j'ai ouvert le trade
+                takeprofit = trade_history[-1]['profit_goal']
+            except IndexError as e:
+                # Il y a eu un problème, on va utiliser une solution pas top mais on continue
+                print("IndexError.")
+                takeprofit = acc_info['balancetotale'] * QTE_TP
 
-                    if deal_ref is None:
-                        print("Erreur de fermeture de trade.")
-                        alerte("EXCEPTION", "Erreur de fermeture de trade.")
-                    else:
-                        alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.now()} \n Perte : {position['position']['upl']}")
+            # Si la condition de stop loss est atteinte
+            if position['position']['upl'] <= -stoploss: # en EUR
+                # On ferme la position
+                print(f"STOP LOSS. Perte : {position['position']['upl']}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                should_buy = False
+                should_sell = False
+                rsi_crossed_low = False
+                rsi_crossed_high = False
+                buy_signal = False
+                sell_signal = False
 
-                # Si on atteint le TP 
-                elif (position['position']['upl'] > takeprofit): # en EUR
-                    # On ferme la position
-                    print(f"TAKE PROFIT. Gain : {position['position']['upl']}")
-                    deal_ref = close_position(cst, token, position['position']['dealId'])
-                    
-                    # réinitialisation des déclencheurs
-                    should_buy = False
-                    should_sell = False
-                    rsi_crossed_low = False
-                    rsi_crossed_high = False
-                    buy_signal = False
-                    sell_signal = False
-
-                    if deal_ref is None:
-                        print("Erreur de fermeture de trade.")
-                        alerte("EXCEPTION", "Erreur de fermeture de trade.")
-                    else:
-                        alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.now()} \n Gain : {position['position']['upl']}")
+                if deal_ref is None:
+                    print("Erreur de fermeture de trade.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade.")
                 else:
-                    # Sinon rien 
-                    print(f"Etat du trade: {position['position']['upl']} EUR")
+                    alerte(f"STOP LOSS {TICKER}", f"STOP LOSS effectué à {datetime.now()} \n Perte : {position['position']['upl']}")
+
+            # Si on atteint le TP 
+            elif (position['position']['upl'] > takeprofit): # en EUR
+                # On ferme la position
+                print(f"TAKE PROFIT. Gain : {position['position']['upl']}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+                
+                # réinitialisation des déclencheurs
+                should_buy = False
+                should_sell = False
+                rsi_crossed_low = False
+                rsi_crossed_high = False
+                buy_signal = False
+                sell_signal = False
+
+                if deal_ref is None:
+                    print("Erreur de fermeture de trade.")
+                    alerte("EXCEPTION", "Erreur de fermeture de trade.")
+                else:
+                    alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.now()} \n Gain : {position['position']['upl']}")
             else:
-                # Rien, on est en journée donc on gère la position manuellement
-                pass
+                # Sinon rien 
+                print(f"Etat du trade: {position['position']['upl']} EUR")
 
         # ------------  Initialisation pour la prochaine candle ------------ #
         previous_timestamp = candle['snapshotTime']

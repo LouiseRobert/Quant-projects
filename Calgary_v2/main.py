@@ -94,7 +94,7 @@ def calgary():
 
         #  ------------ Somme nous la nuit ? ------------ #
         ### l'heure est bonne si il est 9h passé
-        daytime = now.time() >= time(9, 0)
+        daytime = True #now.time() >= time(9, 0)
 
         #  ------------ Sommes nous en position ? ------------ #
         positions = fetch_current_positions(cst, token)

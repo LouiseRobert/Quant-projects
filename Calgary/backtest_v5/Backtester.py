@@ -1,6 +1,4 @@
-from Trendline import Trendline
-
-BALANCE = 100 # Balance totale du compte
+BALANCE = 30 # Balance totale du compte
 LEVERAGE = 20 # Levier
 SPREAD = 0.4 # dollars
 
@@ -45,105 +43,122 @@ class Backtester:
         return self.dataframe[label].loc[:index].iloc[-k:].tolist()
     
     def on_candle(self, candle, index):
+        open = candle["Open"]
         close = candle["Close"]
         high = candle["High"]
         low = candle["Low"]
         rsi = candle["RSI"]
         datetime = candle["horodatage"]
         timestamp = candle["timestamp"]
+        
+        buy_signal = False
+        sell_signal = False
+        shouldibuy = False
+        shouldisell = False
 
-        if self.trendline is not None:
-            self.trendline.current += 1
-
+        daytime = True #datetime.hour > 9 
+        print(f"{datetime} ----- RSI : {rsi}, close : {close}")
         # Position en cours ?
         if self.position is None:
             #### Conditions de long
 
+            # couleur de la candle 
+            if open < close:
+                candle_color = "green"
+            else:
+                candle_color = "red"
+
             # Si le RSI passe de inférieur à 30 à supérieur à 30 et que le RSI actuel est < au précédent
-            if rsi < 27 :
+            if rsi < 30 :
                 self.rsi_cross_low = True
-            # Alors on considère qu'on est en position longue
-            shouldibuy = self.rsi_cross_low and (rsi > 42)
+                self.rsi_cross_high = False # protection en cas de retournement
 
             #### Conditions de short
             # Si le RSI croise la barre des 73 par le dessus 
-            if rsi > 73 :
+            if rsi > 70 :
                 self.rsi_cross_high = True
-            # Alors on considère qu'on est en position short
-            shouldisell = self.rsi_cross_high and (rsi < 57) 
+                self.rsi_cross_low = False # protection en cas de retournement
 
-            if rsi > 50:
-                self.rsi_cross_low = False
-            else:
-                self.rsi_cross_high = False
+            # Quand le RSI signale le retournement, on surveille le signal
+            if self.rsi_cross_low and (rsi > 45):
+                buy_signal = True
+                sell_signal = False # protection en cas de retournement
 
-            friday_after_21 = datetime.weekday() == 4 and datetime.hour > 21 
+            if self.rsi_cross_high and (rsi < 55) :
+                sell_signal = True
+                buy_signal = False # protection en cas de retournement
+
+            # On entre en position après une candle inverse
+            if buy_signal and candle_color == "red":
+                shouldibuy = True and daytime
+
+            if sell_signal and candle_color == "green":
+                shouldisell = True and daytime
             
             # === OUVERTURE DE POSITION SHORT ===
-            if shouldisell == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)) and not friday_after_21:
+            if shouldisell == True and daytime:
                 direction = "short"
+                print("SELL")
 
                 exec_price = self.get_execution_price(close, direction, "entry")
                 self.open_position(exec_price, direction)
 
                 self.durations["open"] = timestamp
 
-                ### Trendline descendante
-                # High des 5 candles précédentes
-                previous_highs = self.last_candles(index, "High", 5)
-
-                # Création de la trendline
-                self.trendline = Trendline(direction=direction, prices=previous_highs)
+                shouldisell = False
+                sell_signal = False
 
             # === OUVERTURE DE POSITION LONG ===
-            elif shouldibuy == True and (datetime.hour < 22 or (datetime.hour == 22 and datetime.minute <= 30)) and not friday_after_21:
+            elif shouldibuy == True and daytime:
                 direction = "long"
+                print("BUY")
 
                 exec_price = self.get_execution_price(close, direction, "entry")
                 self.open_position(exec_price, "long")
 
                 self.durations["open"] = timestamp
 
-                ### Trendline montante
-                # lows des 5 candles précédentes
-                previous_lows = self.last_candles(index, "Low", 5)
-
-                # Création de la trendline
-                self.trendline = Trendline(direction=direction, prices=previous_lows)
+                shouldibuy = False
+                buy_signal = False
 
         # Si oui, on va gérer notre position en cours
         else:
             ### Conditions de vente de la position longue
 
             if self.position == "short":
-                trois_dernieres_candles = self.last_candles(index, label = "High", k=3)
-                trendline_status = self.trendline.update(trois_dernieres_candles)
-
                 exec_price = self.get_execution_price(high, "long", "exit") # prix d'execution de sortie du short au prix ASK
 
-                # === BREAKOUT SHORT ===
-                if trendline_status == "breakout" or exec_price >= self.stoploss:
+                # === STOP LOSS SHORT ===
+                if exec_price >= self.stoploss:
                     self.durations["close"] = timestamp
-                    print("EXIT TRENDLINE SHORT", candle.name, exec_price, self.trendline.price_at(self.trendline.current))
-                    self.exit_trade("Breakout", "short", exec_price, candle.name)
+                    self.exit_trade("Stop loss short", "short", exec_price, candle.name)
 
+                # === TAKE PROFIT SHORT ===
+                elif low <= self.takeprofit:
+                    exec_price = self.get_execution_price(low, "long", "exit") # prix d'execution de sortie du short au prix ASK
+                    self.durations["close"] = timestamp
+
+                    self.exit_trade("take profit", "short", exec_price, candle.name)
+                    
                 # === Rien ===
                 else:
                     pass
 
             elif self.position == "long":
-                trois_dernieres_candles = self.last_candles(index, label = "Low", k=3)
-                trendline_status = self.trendline.update(trois_dernieres_candles)
-
                 exec_price = self.get_execution_price(low, "short", "exit") # prix d'execution de sortie du long au prix BID
 
-                # === BREAKOUT LONG ===
-                if trendline_status == "breakout" or exec_price <= self.stoploss:
+                # === STOP LOSS LONG ===
+                if exec_price <= self.stoploss:
                     self.durations["close"] = timestamp
-                    print("EXIT TRENDLINE SHORT", candle.name, exec_price, self.trendline.price_at(self.trendline.current))
-                    self.exit_trade("Breakout", "long", exec_price, candle.name)
+                    self.exit_trade("Stop loss long", "long", exec_price, candle.name)
 
-                # === Modification du TP à Break even ===
+                # === TAKE PROFIT LONG ===
+                elif high >= self.takeprofit:
+                    self.durations["close"] = timestamp
+                    exec_price = self.get_execution_price(high, "short", "exit") # prix d'execution de sortie du long au prix BID
+
+                    self.exit_trade("take profit", "long", exec_price, candle.name)
+                    
                 else:
                     pass
             else:
@@ -177,10 +192,10 @@ class Backtester:
         # prix de SL / TP correct
         if self.position == "long":
             self.stoploss = entry_price - (loss_amount / self.units)
-            self.takeprofit = entry_price + (profit_amount / self.units) + half_spread
+            self.takeprofit = entry_price + (profit_amount / self.units)
         elif self.position == "short":
             self.stoploss = entry_price + (loss_amount / self.units)
-            self.takeprofit = entry_price - (profit_amount / self.units) - half_spread
+            self.takeprofit = entry_price - (profit_amount / self.units)
         else:
             raise ValueError("direction must be 'long' or 'short'")
         
@@ -206,7 +221,7 @@ class Backtester:
 
         self.close_position(pnl)
 
-        # print(f"{datetime} --- {direction} {label} --- prix d'entree : {self.entry_price} --- {self.balance} ---")
+        print(f"{datetime} --- {direction} {label} --- prix d'entree : {self.entry_price} --- {self.balance} ---")
 
         # Reset
         self.reset()

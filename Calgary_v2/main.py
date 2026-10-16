@@ -194,7 +194,7 @@ def calgary():
                 print("IndexError.")
                 takeprofit = acc_info['balancetotale'] * QTE_TP
 
-            created_date = datetime.strptime(position["createdDateUTC"],"%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
+            created_date = datetime.strptime(position['position']["createdDateUTC"],"%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
             
             now = datetime.now(timezone.utc)
             duration = (now - created_date).total_seconds()

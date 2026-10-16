@@ -80,19 +80,19 @@ class Backtester:
                 self.rsi_cross_low = False # protection en cas de retournement
 
             # Quand le RSI signale le retournement, on surveille le signal
-            if self.rsi_cross_low and (rsi > 45):
+            if self.rsi_cross_low and (rsi > 30):
                 buy_signal = True
                 sell_signal = False # protection en cas de retournement
 
-            if self.rsi_cross_high and (rsi < 55) :
+            if self.rsi_cross_high and (rsi < 70) :
                 sell_signal = True
                 buy_signal = False # protection en cas de retournement
 
             # On entre en position après une candle inverse
-            if buy_signal and candle_color == "red":
+            if buy_signal: # and candle_color == "red":
                 shouldibuy = True and daytime
 
-            if sell_signal and candle_color == "green":
+            if sell_signal: # and candle_color == "green":
                 shouldisell = True and daytime
             
             # === OUVERTURE DE POSITION SHORT ===

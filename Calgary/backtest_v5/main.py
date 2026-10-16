@@ -4,10 +4,10 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi, monte_carlo_simulation, compute_atr
 import numpy as np
 
-DATA_FILE = "./data/XAU_1m_12_2025.csv"
+DATA_FILE = "./data/XAU_1m_09_2025.csv"
 
-LOSS_RATE = 0.02
-PROFIT_RATE = 0.0012
+LOSS_RATE = 0.019
+PROFIT_RATE = 0.001
 
 def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     df = pd.read_csv(DATA_FILE, sep=";")

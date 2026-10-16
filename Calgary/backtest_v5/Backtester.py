@@ -80,19 +80,19 @@ class Backtester:
                 self.rsi_cross_low = False # protection en cas de retournement
 
             # Quand le RSI signale le retournement, on surveille le signal
-            if self.rsi_cross_low and (rsi > 30):
+            if self.rsi_cross_low and (rsi > 38):
                 buy_signal = True
                 sell_signal = False # protection en cas de retournement
 
-            if self.rsi_cross_high and (rsi < 70) :
+            if self.rsi_cross_high and (rsi < 62) :
                 sell_signal = True
                 buy_signal = False # protection en cas de retournement
 
             # On entre en position après une candle inverse
-            if buy_signal: # and candle_color == "red":
+            if buy_signal :#and candle_color == "red":
                 shouldibuy = True and daytime
 
-            if sell_signal: # and candle_color == "green":
+            if sell_signal :#and candle_color == "green":
                 shouldisell = True and daytime
             
             # === OUVERTURE DE POSITION SHORT ===
@@ -140,7 +140,7 @@ class Backtester:
 
                     self.exit_trade("take profit", "short", exec_price, candle.name)
 
-                elif (timestamp - self.durations["open"])/1000000000 > 1500:
+                elif (timestamp - self.durations["open"])/1000000000 > 900:
                     exec_price = self.get_execution_price(close, "long", "exit") # prix d'execution de sortie du short au prix ASK
                     self.durations["close"] = timestamp
 
@@ -164,11 +164,11 @@ class Backtester:
 
                     self.exit_trade("take profit", "long", exec_price, candle.name)
 
-                elif (timestamp - self.durations["open"])/1000000000 > 1500:
+                elif (timestamp - self.durations["open"])/1000000000 > 900:
                     exec_price = self.get_execution_price(close, "short", "exit") # prix d'execution de sortie du short au prix ASK
                     self.durations["close"] = timestamp
 
-                    self.exit_trade("Time stop", "short", exec_price, candle.name)
+                    self.exit_trade("Time stop", "long", exec_price, candle.name)
 
                 else:
                     pass

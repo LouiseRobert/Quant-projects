@@ -69,13 +69,13 @@ class Backtester:
                 candle_color = "red"
 
             # Si le RSI passe de inférieur à 30 à supérieur à 30 et que le RSI actuel est < au précédent
-            if rsi < 30 :
+            if rsi < 33 :
                 self.rsi_cross_low = True
                 self.rsi_cross_high = False # protection en cas de retournement
 
             #### Conditions de short
             # Si le RSI croise la barre des 73 par le dessus 
-            if rsi > 70 :
+            if rsi > 67 :
                 self.rsi_cross_high = True
                 self.rsi_cross_low = False # protection en cas de retournement
 
@@ -139,7 +139,12 @@ class Backtester:
                     self.durations["close"] = timestamp
 
                     self.exit_trade("take profit", "short", exec_price, candle.name)
-                    
+
+                elif (timestamp - self.durations["open"])/1000000000 > 1500:
+                    exec_price = self.get_execution_price(close, "long", "exit") # prix d'execution de sortie du short au prix ASK
+                    self.durations["close"] = timestamp
+
+                    self.exit_trade("Time stop", "short", exec_price, candle.name)
                 # === Rien ===
                 else:
                     pass
@@ -158,7 +163,13 @@ class Backtester:
                     exec_price = self.get_execution_price(high, "short", "exit") # prix d'execution de sortie du long au prix BID
 
                     self.exit_trade("take profit", "long", exec_price, candle.name)
-                    
+
+                elif (timestamp - self.durations["open"])/1000000000 > 1500:
+                    exec_price = self.get_execution_price(close, "short", "exit") # prix d'execution de sortie du short au prix ASK
+                    self.durations["close"] = timestamp
+
+                    self.exit_trade("Time stop", "short", exec_price, candle.name)
+
                 else:
                     pass
             else:

@@ -282,7 +282,7 @@ def create_position(cst, token, direction, available_balance, leverage):
     "direction": direction, # BUY ou SELL
     "size": size, # genre 0.3 
     "guaranteedStop": True, # True pour moi car pas le choix
-    "stopAmount": math.ceil(available_balance*QTE_LOSS * 100) / 100,  # Quantité à perdre si SL 
+    "stopAmount": math.ceil(available_balance*QTE_LOSS * 100) / 10,  # Quantité à perdre si SL 
     "profitAmount": math.floor(available_balance*QTE_TP*100)/100
     })
     headers = {

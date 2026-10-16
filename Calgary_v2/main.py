@@ -200,7 +200,6 @@ def calgary():
             duration = (now - created_date).total_seconds()
 
             market_status= get_market_status(cst, token)
-            print(market_status)
             
             # Si la condition de stop loss est atteinte
             if position['position']['upl'] <= -stoploss: # en EUR

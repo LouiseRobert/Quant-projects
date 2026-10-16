@@ -380,14 +380,13 @@ def get_market_status(cst, token):
         'X-SECURITY-TOKEN': token,
         'CST': cst
         }
-        conn.request("GET", f"/api/v1/markets?searchTerm=epics={TICKER}", payload, headers)
+        conn.request("GET", f"/api/v1/markets?searchTerm={TICKER}", payload, headers)
         res = conn.getresponse()
         data = res.read()
 
         json_str = data.decode("utf-8")
 
         data_dict = json.loads(json_str)
-        print(data_dict)
         if data_dict['markets'] is not None:
             status = data_dict["markets"][0]["marketStatus"]
         else:

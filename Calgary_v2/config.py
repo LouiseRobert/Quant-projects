@@ -13,11 +13,11 @@ CALGARY_ACCOUNT_NAME = "Calgary"
 
 ### PARAMETRES RSI
 RSI_PERIOD = 14
-RSI_HIGH = 70
-RSI_LOW = 30
+RSI_HIGH = 67
+RSI_LOW = 33
 
-QTE_LOSS = 0.02 # 3% de perte
-QTE_TP = 0.0012 # 0.12% de gain si TP
+QTE_LOSS = 0.015 # 3% de perte
+QTE_TP = 0.001 # 0.12% de gain si TP
 
 CANDLE_SIZE = "MINUTE" #"MINUTE_5"
 

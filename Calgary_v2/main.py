@@ -1,5 +1,5 @@
 import time as time_module
-from datetime import datetime, time
+from datetime import datetime, timezone
  
 from config import *
 from maths import *
@@ -65,13 +65,6 @@ def calgary():
 
         open = (candle['openPrice']['bid'] + candle['openPrice']['ask']) /2
 
-        # Calcul de la couleur de la candle:
-        candle_color = "green" # vert par défaut
-        if close >= open:
-            candle_color = "green"
-        else:
-            candle_color = "red"
-
         gain = max(delta, 0)
         loss = max(-delta, 0)
 
@@ -128,19 +121,19 @@ def calgary():
                 rsi_crossed_low = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
             # quand le RSI signale un retournement, on surveille le signal
-            if rsi_crossed_low and (current_rsi > 42):
+            if rsi_crossed_low and (current_rsi > 33):
                 buy_signal = True
                 sell_signal = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
-            if rsi_crossed_high and (current_rsi < 58):
+            if rsi_crossed_high and (current_rsi < 67):
                 sell_signal = True
                 buy_signal = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
             # on entre en position après une candle inverse                
-            if buy_signal and candle_color == "red":
+            if buy_signal: # and candle_color == "red":
                 should_buy = True and daytime
 
-            if sell_signal and candle_color == "green":
+            if sell_signal: # and candle_color == "green":
                 should_sell = True and daytime
             
             # RSI vient de croiser sa borne supérieure et rerentrer dans la norme RSI ?
@@ -184,8 +177,6 @@ def calgary():
             else:
                 print(f"Pas de trade en cours. RSI : {current_rsi}")
         else:
-            # On ne manage les position que la journée
-
             position = positions[0] # 1 trade à la fois
             try:
                 # stop loss : 5% de la balance totale au moment ou j'ai ouvert le trade
@@ -203,6 +194,11 @@ def calgary():
                 print("IndexError.")
                 takeprofit = acc_info['balancetotale'] * QTE_TP
 
+            created_date = datetime.strptime(position["createdDateUTC"],"%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
+            
+            now = datetime.now(timezone.utc)
+            duration = (now - created_date).total_seconds()
+            
             # Si la condition de stop loss est atteinte
             if position['position']['upl'] <= -stoploss: # en EUR
                 # On ferme la position
@@ -242,6 +238,24 @@ def calgary():
                     alerte("EXCEPTION", "Erreur de fermeture de trade.")
                 else:
                     alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.now()} \n Gain : {position['position']['upl']}")
+
+            elif duration > 1000:
+                print(f"TIME STOP. Gain : {position['position']['upl']}")
+                deal_ref = close_position(cst, token, position['position']['dealId'])
+
+                # réinitialisation des déclencheurs
+                should_buy = False
+                should_sell = False
+                rsi_crossed_low = False
+                rsi_crossed_high = False
+                buy_signal = False
+                sell_signal = False
+
+                if deal_ref is None:
+                    print("Erreur de fermeture de trade.")
+                    alerte("EXCEPTION TIME STOP", "Erreur de fermeture de trade.")
+                else:
+                    alerte(f"TIME STOP {TICKER}", f"TIME STOP effectué à {datetime.now()} \n PnL : {position['position']['upl']}")
             else:
                 # Sinon rien 
                 print(f"Etat du trade: {position['position']['upl']} EUR")

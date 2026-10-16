@@ -315,6 +315,7 @@ def close_position(cst, token, deal_id):
 
     :return: la reference de la position fermée
     """
+    position_ref = None
     conn = http.client.HTTPSConnection(API_FQDN)
     payload = ''
     headers = {
@@ -361,3 +362,38 @@ def fetch_current_positions(cst, token):
     positions = data_dict.get('positions', [])
 
     return positions
+
+def get_market_status(cst, token):
+    """
+    Renvoie le statut du marché de TICKER
+    
+    :param cst: Description
+    :param token: Description
+    :param direction: Description
+    """
+    try:
+        status = None
+
+        conn = http.client.HTTPSConnection(API_FQDN)
+        payload = ''
+        headers = {
+        'X-SECURITY-TOKEN': token,
+        'CST': cst
+        }
+        conn.request("GET", f"/api/v1/markets?searchTerm=epics={TICKER}", payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+
+        json_str = data.decode("utf-8")
+
+        data_dict = json.loads(json_str)
+
+        if data_dict['markets'] is not None:
+            status = data_dict["markets"][0]["marketStatus"]
+        else:
+            print("Error: impossible de récupérer le status du marché.")
+
+    except Exception as e:
+        print(f"ERREUR: Récupération du statut du marché : {e}")
+
+    return status

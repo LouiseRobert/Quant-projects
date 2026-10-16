@@ -198,6 +198,9 @@ def calgary():
             
             now = datetime.now(timezone.utc)
             duration = (now - created_date).total_seconds()
+
+            market_status= get_market_status(cst, token)
+            print(market_status)
             
             # Si la condition de stop loss est atteinte
             if position['position']['upl'] <= -stoploss: # en EUR
@@ -239,7 +242,7 @@ def calgary():
                 else:
                     alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.now()} \n Gain : {position['position']['upl']}")
 
-            elif duration > 1000:
+            elif market_status == "TRADEABLE" and duration > 1000:
                 print(f"TIME STOP. Gain : {position['position']['upl']}")
                 deal_ref = close_position(cst, token, position['position']['dealId'])
 

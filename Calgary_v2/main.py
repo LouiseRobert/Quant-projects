@@ -1,5 +1,5 @@
 import time as time_module
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time
  
 from config import *
 from maths import *
@@ -87,7 +87,7 @@ def calgary():
 
         #  ------------ Somme nous la nuit ? ------------ #
         ### l'heure est bonne si il est 9h passé
-        daytime = True #now.time() >= time(9, 0)
+        daytime = now.time() >= time(9, 0)
 
         #  ------------ Sommes nous en position ? ------------ #
         positions = fetch_current_positions(cst, token)
@@ -121,11 +121,11 @@ def calgary():
                 rsi_crossed_low = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
             # quand le RSI signale un retournement, on surveille le signal
-            if rsi_crossed_low and (current_rsi > 33):
+            if rsi_crossed_low and (current_rsi > 42):
                 buy_signal = True
                 sell_signal = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
-            if rsi_crossed_high and (current_rsi < 67):
+            if rsi_crossed_high and (current_rsi < 58):
                 sell_signal = True
                 buy_signal = False # réinitialisation dans le cas ou le prix se serait trop retourné
 
@@ -241,7 +241,7 @@ def calgary():
                 else:
                     alerte(f"TAKE PROFIT {TICKER}", f"TAKE PROFIT effectué à {datetime.now()} \n Gain : {position['position']['upl']}")
 
-            elif market_status == "TRADEABLE" and duration > 1000:
+            elif market_status == "TRADEABLE" and duration > 5400:
                 print(f"TIME STOP. Gain : {position['position']['upl']}")
                 deal_ref = close_position(cst, token, position['position']['dealId'])
 

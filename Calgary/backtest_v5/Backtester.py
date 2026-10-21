@@ -56,7 +56,7 @@ class Backtester:
         shouldibuy = False
         shouldisell = False
 
-        daytime = True #datetime.hour > 9 
+        daytime = True # not (datetime.weekday() == 4 and datetime.hour >= 22)
         print(f"{datetime} ----- RSI : {rsi}, close : {close}")
         # Position en cours ?
         if self.position is None:
@@ -80,11 +80,11 @@ class Backtester:
                 self.rsi_cross_low = False # protection en cas de retournement
 
             # Quand le RSI signale le retournement, on surveille le signal
-            if self.rsi_cross_low and (rsi > 38):
+            if self.rsi_cross_low and (rsi > 33):
                 buy_signal = True
                 sell_signal = False # protection en cas de retournement
 
-            if self.rsi_cross_high and (rsi < 62) :
+            if self.rsi_cross_high and (rsi < 67) :
                 sell_signal = True
                 buy_signal = False # protection en cas de retournement
 

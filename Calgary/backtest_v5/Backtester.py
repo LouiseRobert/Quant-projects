@@ -56,7 +56,7 @@ class Backtester:
         shouldibuy = False
         shouldisell = False
 
-        daytime = True # not (datetime.weekday() == 4 and datetime.hour >= 22)
+        daytime = datetime.hour >= 9 and not (datetime.weekday() == 4 and datetime.hour >= 22)
         print(f"{datetime} ----- RSI : {rsi}, close : {close}")
         # Position en cours ?
         if self.position is None:
@@ -69,22 +69,22 @@ class Backtester:
                 candle_color = "red"
 
             # Si le RSI passe de inférieur à 30 à supérieur à 30 et que le RSI actuel est < au précédent
-            if rsi < 33 :
+            if rsi < 30 :
                 self.rsi_cross_low = True
                 self.rsi_cross_high = False # protection en cas de retournement
 
             #### Conditions de short
             # Si le RSI croise la barre des 73 par le dessus 
-            if rsi > 67 :
+            if rsi > 70 :
                 self.rsi_cross_high = True
                 self.rsi_cross_low = False # protection en cas de retournement
 
             # Quand le RSI signale le retournement, on surveille le signal
-            if self.rsi_cross_low and (rsi > 33):
+            if self.rsi_cross_low and (rsi > 42):
                 buy_signal = True
                 sell_signal = False # protection en cas de retournement
 
-            if self.rsi_cross_high and (rsi < 67) :
+            if self.rsi_cross_high and (rsi < 58) :
                 sell_signal = True
                 buy_signal = False # protection en cas de retournement
 
@@ -140,7 +140,7 @@ class Backtester:
 
                     self.exit_trade("take profit", "short", exec_price, candle.name)
 
-                elif (timestamp - self.durations["open"])/1000000000 > 900:
+                elif (timestamp - self.durations["open"])/1000000000 > 5400:
                     exec_price = self.get_execution_price(close, "long", "exit") # prix d'execution de sortie du short au prix ASK
                     self.durations["close"] = timestamp
 
@@ -164,7 +164,7 @@ class Backtester:
 
                     self.exit_trade("take profit", "long", exec_price, candle.name)
 
-                elif (timestamp - self.durations["open"])/1000000000 > 900:
+                elif (timestamp - self.durations["open"])/1000000000 > 5400:
                     exec_price = self.get_execution_price(close, "short", "exit") # prix d'execution de sortie du short au prix ASK
                     self.durations["close"] = timestamp
 

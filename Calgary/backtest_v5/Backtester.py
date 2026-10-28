@@ -48,6 +48,7 @@ class Backtester:
         high = candle["High"]
         low = candle["Low"]
         rsi = candle["RSI"]
+        rsi5min = candle['rsi_5m']
         datetime = candle["horodatage"]
         timestamp = candle["timestamp"]
         
@@ -56,7 +57,7 @@ class Backtester:
         shouldibuy = False
         shouldisell = False
 
-        daytime = datetime.hour >= 9 and not (datetime.weekday() == 4 and datetime.hour >= 22)
+        daytime = True # not (datetime.weekday() == 4 and datetime.hour >= 22)
         print(f"{datetime} ----- RSI : {rsi}, close : {close}")
         # Position en cours ?
         if self.position is None:
@@ -69,22 +70,22 @@ class Backtester:
                 candle_color = "red"
 
             # Si le RSI passe de inférieur à 30 à supérieur à 30 et que le RSI actuel est < au précédent
-            if rsi < 30 :
+            if rsi5min < 30 :
                 self.rsi_cross_low = True
                 self.rsi_cross_high = False # protection en cas de retournement
 
             #### Conditions de short
             # Si le RSI croise la barre des 73 par le dessus 
-            if rsi > 70 :
+            if rsi5min > 70 :
                 self.rsi_cross_high = True
                 self.rsi_cross_low = False # protection en cas de retournement
 
             # Quand le RSI signale le retournement, on surveille le signal
-            if self.rsi_cross_low and (rsi > 42):
+            if self.rsi_cross_low and (rsi > 55) and (rsi5min > 40):
                 buy_signal = True
                 sell_signal = False # protection en cas de retournement
 
-            if self.rsi_cross_high and (rsi < 58) :
+            if self.rsi_cross_high and (rsi < 45) and (rsi5min < 60):
                 sell_signal = True
                 buy_signal = False # protection en cas de retournement
 
@@ -129,7 +130,7 @@ class Backtester:
                 exec_price = self.get_execution_price(high, "long", "exit") # prix d'execution de sortie du short au prix ASK
 
                 # === STOP LOSS SHORT ===
-                if exec_price >= self.stoploss:
+                if exec_price >= self.stoploss or rsi > 70:
                     self.durations["close"] = timestamp
                     self.exit_trade("Stop loss short", "short", exec_price, candle.name)
 
@@ -140,7 +141,7 @@ class Backtester:
 
                     self.exit_trade("take profit", "short", exec_price, candle.name)
 
-                elif (timestamp - self.durations["open"])/1000000000 > 5400:
+                elif (timestamp - self.durations["open"])/1000000000 > 20000:
                     exec_price = self.get_execution_price(close, "long", "exit") # prix d'execution de sortie du short au prix ASK
                     self.durations["close"] = timestamp
 
@@ -153,7 +154,7 @@ class Backtester:
                 exec_price = self.get_execution_price(low, "short", "exit") # prix d'execution de sortie du long au prix BID
 
                 # === STOP LOSS LONG ===
-                if exec_price <= self.stoploss:
+                if exec_price <= self.stoploss or rsi > 30:
                     self.durations["close"] = timestamp
                     self.exit_trade("Stop loss long", "long", exec_price, candle.name)
 
@@ -164,7 +165,7 @@ class Backtester:
 
                     self.exit_trade("take profit", "long", exec_price, candle.name)
 
-                elif (timestamp - self.durations["open"])/1000000000 > 5400:
+                elif (timestamp - self.durations["open"])/1000000000 > 20000:
                     exec_price = self.get_execution_price(close, "short", "exit") # prix d'execution de sortie du short au prix ASK
                     self.durations["close"] = timestamp
 

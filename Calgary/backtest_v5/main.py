@@ -4,13 +4,16 @@ from Backtester import Backtester
 from maths import bollinger_bands, rsi, monte_carlo_simulation, compute_atr
 import numpy as np
 
-DATA_FILE = "./data/XAU_1m_2025.csv"
+DATA_FILE = "./data/XAU_1m_01_2025.csv"
+AUX_DATA_FILE = "./data/XAU_5m_01_2025.csv"
+CANDLE_FILE_NAME = "candles_1m_01_2025.csv"
 
-LOSS_RATE = 0.025
+LOSS_RATE = 0.03
 PROFIT_RATE = 0.005
 
 def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
     df = pd.read_csv(DATA_FILE, sep=";")
+    aux_df = pd.read_csv(AUX_DATA_FILE, sep=";")
 
     # Conversion de la colonne Date en datetime
     df["datetime"] = pd.to_datetime(
@@ -18,24 +21,41 @@ def main(tp_rate = PROFIT_RATE, sl_rate = LOSS_RATE):
         format="%Y.%m.%d %H:%M"
     )
 
+    aux_df["datetime"] = pd.to_datetime(
+            aux_df["Date"],
+            format="%Y.%m.%d %H:%M"
+        )
+
     # Conversion en timestamp Unix (secondes)
     df["timestamp"] = df["datetime"].astype("int64") # 10**9
+    aux_df["timestamp"] = aux_df["datetime"].astype("int64")
 
     df["horodatage"] = df["datetime"]
+    aux_df["horodatage"] = aux_df["datetime"]
 
     # Mettre le datetime en index
     df = df.set_index("datetime")
+    aux_df = aux_df.set_index("datetime")
 
     # Nettoyage des colonnes inutiles
     df = df.drop(columns=["Date"])
+    aux_df = aux_df.drop(columns=["Date"])
 
     # Ajout de la colonne RSI pour chaque candle
     df["RSI"] = rsi(df["Close"])
+    aux_df["RSI"] = rsi(aux_df["Close"])
 
     # Ajout de la colonne contenant le RSI précédent
     df['RSI-1'] = df['RSI'].shift(1)
+    aux_df['RSI-1'] = aux_df['RSI'].shift(1)
+
+    df['datetime_5m'] = df.index.floor('5min') - pd.Timedelta(minutes=5)
+    df['rsi_5m'] = df['datetime_5m'].map(aux_df['RSI'])
 
     df = df.dropna()
+    aux_df = aux_df.dropna()
+
+    df.to_csv(CANDLE_FILE_NAME, sep=";", index=True)
 
     bt = Backtester(df, profit_rate=tp_rate, loss_rate=sl_rate)
 
